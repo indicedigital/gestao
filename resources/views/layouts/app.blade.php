@@ -396,6 +396,38 @@
             background: #f7fafc;
         }
         
+        .user-profile-dropdown {
+            min-width: 200px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        
+        .user-profile-dropdown .dropdown-item {
+            padding: 12px 20px;
+            font-size: 14px;
+            color: #1a202c;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-profile-dropdown .dropdown-item:hover {
+            background: #f7fafc;
+            color: var(--primary-color);
+        }
+        
+        .user-profile-dropdown .dropdown-item.logout {
+            color: var(--danger-color);
+        }
+        
+        .user-profile-dropdown .dropdown-item.logout:hover {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+        
         .user-avatar {
             width: 36px;
             height: 36px;
@@ -663,14 +695,27 @@
                 <div class="header-icon" title="Mensagens">
                     <i class="fas fa-comment"></i>
                 </div>
-                <div class="user-profile">
-                    <div class="user-avatar">
-                        {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
+                <div class="dropdown">
+                    <div class="user-profile" id="userProfileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <div class="user-avatar">
+                            {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">{{ Auth::user()->name }}</div>
+                            <div class="user-role">{{ Auth::user()->is_super_admin ? 'Super Admin' : 'Usuário' }}</div>
+                        </div>
                     </div>
-                    <div class="user-info">
-                        <div class="user-name">{{ Auth::user()->name }}</div>
-                        <div class="user-role">{{ Auth::user()->is_super_admin ? 'Super Admin' : 'Usuário' }}</div>
-                    </div>
+                    <ul class="dropdown-menu dropdown-menu-end user-profile-dropdown" aria-labelledby="userProfileDropdown">
+                        <li>
+                            <form method="POST" action="{{ route('logout') }}" style="margin: 0;">
+                                @csrf
+                                <button type="submit" class="dropdown-item logout" style="width: 100%; border: none; background: none; text-align: left;">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Sair</span>
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </header>
