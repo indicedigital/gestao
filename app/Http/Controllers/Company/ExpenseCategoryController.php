@@ -30,12 +30,21 @@ class ExpenseCategoryController extends Controller
         return Company::findOrFail($companyId);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $company = $this->getCurrentCompany();
         $categories = ExpenseCategory::where('company_id', $company->id)
             ->latest()
             ->paginate(15);
+        
+        // Detecta se é mobile
+        $isMobile = $request->has('mobile') || 
+                   $request->cookie('is_mobile') === '1' ||
+                   (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
+        
+        if ($isMobile) {
+            return view('company.expense-categories.index-mobile', compact('categories', 'company'));
+        }
         
         return view('company.expense-categories.index', compact('categories', 'company'));
     }

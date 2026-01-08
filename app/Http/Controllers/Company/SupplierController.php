@@ -30,12 +30,21 @@ class SupplierController extends Controller
         return Company::findOrFail($companyId);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $company = $this->getCurrentCompany();
         $suppliers = Supplier::where('company_id', $company->id)
             ->latest()
             ->paginate(15);
+        
+        // Detecta se é mobile
+        $isMobile = $request->has('mobile') || 
+                   $request->cookie('is_mobile') === '1' ||
+                   (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
+        
+        if ($isMobile) {
+            return view('company.suppliers.index-mobile', compact('suppliers', 'company'));
+        }
         
         return view('company.suppliers.index', compact('suppliers', 'company'));
     }

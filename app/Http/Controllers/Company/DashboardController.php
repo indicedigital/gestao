@@ -356,7 +356,12 @@ class DashboardController extends Controller
         // Despesas por categoria no mês - OTIMIZADO: Remove N+1 query
         $expensesByCategoryChart = $this->getExpensesByCategoryChart($company, $now, $payrollCache);
         
-        return view('company.dashboard', compact(
+        // Detecta se é mobile
+        $isMobile = $this->isMobile($request);
+        
+        $view = $isMobile ? 'company.dashboard-mobile' : 'company.dashboard';
+        
+        return view($view, compact(
             'company',
             'selectedMonth',
             'monthFilter',
@@ -545,5 +550,37 @@ class DashboardController extends Controller
         }
         
         return $history;
+    }
+    
+    /**
+     * Detecta se a requisição é de um dispositivo mobile
+     */
+    protected function isMobile(Request $request): bool
+    {
+        $userAgent = $request->header('User-Agent', '');
+        
+        // Verifica se é mobile baseado no User-Agent
+        $mobileAgents = [
+            'Mobile', 'Android', 'iPhone', 'iPad', 'iPod', 
+            'BlackBerry', 'Windows Phone', 'Opera Mini'
+        ];
+        
+        foreach ($mobileAgents as $agent) {
+            if (stripos($userAgent, $agent) !== false) {
+                return true;
+            }
+        }
+        
+        // Verifica se há parâmetro específico para forçar mobile
+        if ($request->has('mobile') && $request->input('mobile') === '1') {
+            return true;
+        }
+        
+        // Verifica largura da tela via cookie (se disponível)
+        if ($request->hasCookie('is_mobile')) {
+            return $request->cookie('is_mobile') === '1';
+        }
+        
+        return false;
     }
 }

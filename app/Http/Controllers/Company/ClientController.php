@@ -91,6 +91,15 @@ class ClientController extends Controller
             'blocked' => Client::where('company_id', $company->id)->where('status', 'blocked')->count(),
         ];
         
+        // Detecta se é mobile
+        $isMobile = $request->has('mobile') || 
+                   $request->cookie('is_mobile') === '1' ||
+                   (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
+        
+        if ($isMobile) {
+            return view('company.clients.index-mobile', compact('clients', 'company', 'stats'));
+        }
+        
         return view('company.clients.index', compact('clients', 'company', 'stats'));
     }
     

@@ -22,13 +22,13 @@
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            overflow: hidden;
-            height: 100vh;
+            overflow-x: hidden;
+            min-height: 100vh;
         }
         
         .login-container {
             display: flex;
-            height: 100vh;
+            min-height: 100vh;
         }
         
         /* Left Panel - Illustration */
@@ -220,32 +220,137 @@
             }
             
             .login-left {
-                flex: 0 0 40vh;
-                padding: 40px;
+                flex: 0 0 auto;
+                min-height: 200px;
+                padding: 40px 30px;
+            }
+            
+            .login-left-image {
+                display: none;
             }
             
             .login-right {
                 flex: 1;
-                padding: 40px;
+                padding: 40px 30px;
             }
             
-            .login-title-left {
-                font-size: 32px;
-            }
-            
-            .login-subtitle-left {
-                font-size: 16px;
-            }
-        }
-        
-        @media (max-width: 576px) {
-            .login-left,
-            .login-right {
-                padding: 30px 24px;
+            .login-form-container {
+                max-width: 100%;
             }
             
             .login-title {
                 font-size: 28px;
+                margin-bottom: 30px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .login-left {
+                padding: 30px 20px;
+                min-height: 150px;
+            }
+            
+            .login-logo-left {
+                margin-bottom: 20px;
+            }
+            
+            .login-logo-left img {
+                height: 35px;
+            }
+            
+            .login-right {
+                padding: 30px 20px;
+            }
+            
+            .login-title {
+                font-size: 24px;
+                margin-bottom: 24px;
+            }
+            
+            .form-group {
+                margin-bottom: 20px;
+            }
+            
+            .form-control-modern {
+                padding: 12px 40px 12px 14px;
+                font-size: 14px;
+            }
+            
+            .btn-login {
+                padding: 12px 20px;
+                font-size: 15px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .login-left {
+                padding: 24px 16px;
+                min-height: 120px;
+            }
+            
+            .login-logo-left {
+                margin-bottom: 16px;
+            }
+            
+            .login-logo-left img {
+                height: 30px;
+            }
+            
+            .login-right {
+                padding: 24px 16px;
+            }
+            
+            .login-title {
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+            
+            .form-label {
+                font-size: 13px;
+            }
+            
+            .form-control-modern {
+                padding: 10px 36px 10px 12px;
+                font-size: 14px;
+            }
+            
+            .form-input-icon {
+                right: 12px;
+                font-size: 14px;
+            }
+            
+            .form-forgot {
+                margin-top: -12px;
+                margin-bottom: 24px;
+            }
+            
+            .form-forgot-link {
+                font-size: 13px;
+            }
+            
+            .btn-login {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+            
+            .alert {
+                padding: 12px;
+                font-size: 13px;
+                margin-bottom: 20px;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            .login-left {
+                padding: 20px 12px;
+            }
+            
+            .login-right {
+                padding: 20px 12px;
+            }
+            
+            .login-title {
+                font-size: 18px;
             }
         }
     </style>

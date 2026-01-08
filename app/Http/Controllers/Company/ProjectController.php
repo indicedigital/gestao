@@ -33,13 +33,22 @@ class ProjectController extends Controller
         return Company::findOrFail($companyId);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $company = $this->getCurrentCompany();
         $projects = Project::where('company_id', $company->id)
             ->with('client')
             ->latest()
             ->paginate(15);
+        
+        // Detecta se é mobile
+        $isMobile = $request->has('mobile') || 
+                   $request->cookie('is_mobile') === '1' ||
+                   (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
+        
+        if ($isMobile) {
+            return view('company.projects.index-mobile', compact('projects', 'company'));
+        }
         
         return view('company.projects.index', compact('projects', 'company'));
     }

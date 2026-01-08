@@ -95,6 +95,15 @@ class ReceivableController extends Controller
         
         $clients = \App\Models\Client::where('company_id', $company->id)->where('status', 'active')->get();
         
+        // Detecta se é mobile
+        $isMobile = $request->has('mobile') || 
+                   $request->cookie('is_mobile') === '1' ||
+                   (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
+        
+        if ($isMobile) {
+            return view('company.receivables.index-mobile', compact('receivables', 'company', 'monthFilter', 'stats', 'clients'));
+        }
+        
         return view('company.receivables.index', compact('receivables', 'company', 'monthFilter', 'stats', 'clients'));
     }
 

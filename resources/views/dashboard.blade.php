@@ -10,7 +10,7 @@
 
 <div class="row">
     <!-- Cards de Estatísticas -->
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-3">
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -29,7 +29,7 @@
         </div>
     </div>
     
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-3">
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -48,7 +48,7 @@
         </div>
     </div>
     
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-3">
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -67,7 +67,7 @@
         </div>
     </div>
     
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-3">
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
