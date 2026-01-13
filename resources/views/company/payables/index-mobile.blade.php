@@ -150,6 +150,13 @@
                    style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: center; text-decoration: none; color: white;">
                     <i class="fas fa-edit"></i> Editar
                 </a>
+                <button type="button" 
+                        class="btn btn-danger btn-sm" 
+                        style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px;"
+                        data-bs-toggle="modal" 
+                        data-bs-target="#deleteModal{{ $payable->id }}">
+                    <i class="fas fa-trash"></i> Excluir
+                </button>
             </div>
         </div>
         @empty
@@ -160,4 +167,34 @@
         @endforelse
     </div>
 </div>
+
+<!-- Modais para exclusão -->
+@foreach($payables as $payable)
+<div class="modal fade" id="deleteModal{{ $payable->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $payable->id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel{{ $payable->id }}">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir esta conta a pagar?</p>
+                <div class="alert alert-warning">
+                    <strong>{{ $payable->description }}</strong><br>
+                    <small>Valor: R$ {{ number_format($payable->value, 2, ',', '.') }} | Vencimento: {{ $payable->due_date->format('d/m/Y') }}</small>
+                </div>
+                <p class="text-danger mb-0"><small>Esta ação não pode ser desfeita.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form action="{{ route('company.payables.destroy', $payable) }}" method="POST" style="display: inline;">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@endforeach
 @endsection

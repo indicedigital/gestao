@@ -357,6 +357,9 @@
                                     <a href="{{ route('company.receivables.edit', $receivable) }}" class="btn btn-sm btn-outline-warning btn-table" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-table" title="Excluir" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $receivable->id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -434,6 +437,36 @@
                             </div>
                         </div>
 @endif
+@endforeach
+
+<!-- Modais para exclusão -->
+@foreach($receivables as $receivable)
+<div class="modal fade" id="deleteModal{{ $receivable->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $receivable->id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel{{ $receivable->id }}">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir esta conta a receber?</p>
+                <div class="alert alert-warning">
+                    <strong>{{ $receivable->description }}</strong><br>
+                    <small>Cliente: {{ $receivable->client->name ?? '-' }} | Valor: R$ {{ number_format($receivable->value, 2, ',', '.') }} | Vencimento: {{ $receivable->due_date->format('d/m/Y') }}</small>
+                </div>
+                <p class="text-danger mb-0"><small>Esta ação não pode ser desfeita.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form action="{{ route('company.receivables.destroy', $receivable) }}" method="POST" style="display: inline;">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 @endforeach
 
 @push('scripts')
