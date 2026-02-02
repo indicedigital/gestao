@@ -284,7 +284,22 @@
                         </div>
                     </div>
 
-                    @if($receivable->paid_date)
+                    @if($receivable->payments->count() > 0)
+                    <div class="info-item">
+                        <div class="info-label">Datas de recebimento ({{ $receivable->payments->count() }} {{ $receivable->payments->count() === 1 ? 'pagamento' : 'pagamentos' }})</div>
+                        <div class="info-value">
+                            @foreach($receivable->payments as $p)
+                                <div class="mb-1">
+                                    <strong>{{ $p->paid_date->format('d/m/Y') }}</strong>
+                                    — R$ {{ number_format($p->amount, 2, ',', '.') }}
+                                    @if($p->payment_method)
+                                        <span class="text-muted">({{ $p->payment_method }})</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @elseif($receivable->paid_date)
                     <div class="info-item">
                         <div class="info-label">Data de Pagamento</div>
                         <div class="info-value">
@@ -321,6 +336,17 @@
                         <div class="info-label">Valor Pendente</div>
                         <div class="info-value">
                             <strong class="text-warning" style="font-size: 18px;">R$ {{ number_format($receivable->value - $receivable->paid_value, 2, ',', '.') }}</strong>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($receivable->remainderReceivable)
+                    <div class="info-item">
+                        <div class="info-label">Duplicata do restante</div>
+                        <div class="info-value">
+                            <a href="{{ route('company.receivables.show', $receivable->remainderReceivable) }}" class="btn btn-outline-primary btn-sm">
+                                Ver duplicata #{{ $receivable->remainderReceivable->id }} — R$ {{ number_format($receivable->remainderReceivable->value, 2, ',', '.') }} (venc. {{ $receivable->remainderReceivable->due_date->format('d/m/Y') }})
+                            </a>
                         </div>
                     </div>
                     @endif

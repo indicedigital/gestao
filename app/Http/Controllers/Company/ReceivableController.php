@@ -152,7 +152,7 @@ class ReceivableController extends Controller
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
         
-        $receivable->load('client', 'project', 'contract');
+        $receivable->load('client', 'project', 'contract', 'payments', 'remainderReceivable');
         return view('company.receivables.show', compact('receivable', 'company'));
     }
 
@@ -168,6 +168,7 @@ class ReceivableController extends Controller
             ->whereIn('type', ['client_recurring', 'client_fixed'])
             ->get();
         
+        $receivable->load('payments', 'remainderReceivable');
         return view('company.receivables.edit', compact('receivable', 'company', 'clients', 'projects', 'contracts'));
     }
 
@@ -175,41 +176,35 @@ class ReceivableController extends Controller
     {
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
-        
-        $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'project_id' => 'nullable|exists:projects,id',
-            'contract_id' => 'nullable|exists:contracts,id',
-            'type' => 'required|in:project,recurring,other',
-            'description' => 'required|string|max:255',
-            'value' => 'required|numeric|min:0',
-            'due_date' => 'required|date',
-            'status' => 'nullable|in:pending,paid,partial,overdue,cancelled',
-            'paid_date' => 'required_if:status,paid|required_if:status,partial|nullable|date',
-            'paid_value' => 'nullable|numeric|min:0',
-            'installment_number' => 'nullable|integer|min:1',
-            'total_installments' => 'nullable|integer|min:1',
-            'payment_method' => 'nullable|string|max:50',
-            'notes' => 'nullable|string',
+
+        // Normaliza valor monetário (formato brasileiro 1.234,56 → 1234.56)
+        $request->merge([
+            'value' => $this->normalizeMoney($request->input('value'), $receivable->value),
         ]);
 
-        // Se status for paid/partial e não tiver paid_date, define como hoje
-        $status = $validated['status'] ?? $receivable->status;
-        if (in_array($status, ['paid', 'partial']) && empty($validated['paid_date'])) {
-            $validated['paid_date'] = now()->toDateString();
-        }
-        
-        // Se status for paid e não tiver paid_value, define como valor total
-        if ($status === 'paid' && empty($validated['paid_value'])) {
-            $validated['paid_value'] = $validated['value'];
-        }
-        
-        // Se status for partial e não tiver paid_value, mantém o atual ou define como 0
-        if ($status === 'partial' && empty($validated['paid_value'])) {
-            $validated['paid_value'] = $receivable->paid_value ?? 0;
+        try {
+            $validated = $request->validate([
+                'client_id' => 'required|exists:clients,id',
+                'project_id' => 'nullable|exists:projects,id',
+                'contract_id' => 'nullable|exists:contracts,id',
+                'type' => 'required|in:project,recurring,other',
+                'description' => 'required|string|max:255',
+                'value' => 'required|numeric|min:0',
+                'due_date' => 'required|date',
+                'status' => 'nullable|in:pending,paid,partial,overdue,cancelled',
+                'installment_number' => 'nullable|integer|min:1',
+                'total_installments' => 'nullable|integer|min:1',
+                'notes' => 'nullable|string',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
         }
 
+        // paid_value, paid_date e status são calculados a partir dos pagamentos (receivable_payments)
         $receivable->update($validated);
+        $receivable->syncPaidFromPayments();
 
         return redirect()->route('company.receivables.index')
             ->with('success', 'Conta a receber atualizada com sucesso!');
@@ -299,5 +294,22 @@ class ReceivableController extends Controller
         if ($receivable->company_id !== $company->id) {
             abort(403, 'Acesso negado.');
         }
+    }
+
+    /**
+     * Converte valor monetário em formato brasileiro (1.234,56) para numérico.
+     */
+    protected function normalizeMoney(mixed $value, mixed $fallback = null): ?float
+    {
+        if ($value === null || $value === '') {
+            return $fallback !== null ? (float) $fallback : null;
+        }
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+        $str = preg_replace('/\s+/', '', (string) $value);
+        $str = str_replace('.', '', $str);
+        $str = str_replace(',', '.', $str);
+        return $str !== '' ? (float) $str : ($fallback !== null ? (float) $fallback : null);
     }
 }

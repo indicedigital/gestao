@@ -129,6 +129,196 @@
             </form>
         </div>
     </div>
+
+    {{-- Parcelas do contrato - detalhado (pagas e não pagas) --}}
+    <div class="card shadow mt-4">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 font-weight-bold"><i class="fas fa-receipt me-2 text-primary"></i>Parcelas do contrato – detalhado</h6>
+            @php
+                $totalParcelas = $contract->installments->count() ?: $contract->receivables->count();
+                $pagas = $contract->installments->count()
+                    ? $contract->installments->where('status', 'paid')->count()
+                    : $contract->receivables->whereIn('status', ['paid'])->count();
+                $pendentes = $totalParcelas - $pagas;
+            @endphp
+            <span class="badge bg-success">{{ $pagas }} paga(s)</span>
+            <span class="badge bg-warning">{{ $pendentes }} pendente(s)</span>
+        </div>
+        <div class="card-body">
+            @if($contract->installments->count() > 0)
+                {{-- Contrato com parcelas (client_fixed) --}}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nº Parcela</th>
+                                <th>Descrição</th>
+                                <th>Valor</th>
+                                <th>Data de vencimento</th>
+                                <th>Status</th>
+                                <th>Valor pago</th>
+                                <th>Data(s) de recebimento</th>
+                                <th>Forma de pagamento</th>
+                                <th>Observações</th>
+                                <th>Conta a receber</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($contract->installments as $inst)
+                            @php
+                                $receivable = $contract->receivables->firstWhere('installment_number', $inst->installment_number);
+                                $statusColors = ['pending' => 'warning', 'paid' => 'success', 'overdue' => 'danger', 'cancelled' => 'secondary'];
+                                $statusLabels = ['pending' => 'Pendente', 'paid' => 'Paga', 'overdue' => 'Vencida', 'cancelled' => 'Cancelada'];
+                                $statusColor = $statusColors[$inst->status] ?? 'secondary';
+                                $statusLabel = $statusLabels[$inst->status] ?? ucfirst($inst->status);
+                                if ($inst->status === 'pending' && $inst->isOverdue()) {
+                                    $statusLabel = 'Vencida';
+                                    $statusColor = 'danger';
+                                }
+                            @endphp
+                            <tr class="{{ ($inst->status === 'pending' && $inst->isOverdue()) ? 'table-danger' : '' }}">
+                                <td><strong>{{ $inst->installment_number }}/{{ $contract->installments->count() }}</strong></td>
+                                <td>{{ $inst->description ?? "Parcela {$inst->installment_number}" }}</td>
+                                <td><strong>R$ {{ number_format($inst->value, 2, ',', '.') }}</strong></td>
+                                <td>
+                                    {{ $inst->due_date->format('d/m/Y') }}
+                                    @if($inst->status === 'pending' && $inst->isOverdue())
+                                        <br><small class="text-danger">{{ (int) floor(now()->diffInDays($inst->due_date, false)) }} dias atrasado</small>
+                                    @endif
+                                </td>
+                                <td><span class="badge bg-{{ $statusColor }}">{{ $statusLabel }}</span></td>
+                                <td>
+                                    @if($inst->status === 'paid')
+                                        <strong class="text-success">R$ {{ number_format($inst->value, 2, ',', '.') }}</strong>
+                                    @elseif($receivable && ($receivable->paid_value ?? 0) > 0)
+                                        <strong class="text-info">R$ {{ number_format($receivable->paid_value, 2, ',', '.') }}</strong>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($receivable && $receivable->relationLoaded('payments') && $receivable->payments->count() > 0)
+                                        @foreach($receivable->payments as $p)
+                                            <div><strong>{{ $p->paid_date->format('d/m/Y') }}</strong> — R$ {{ number_format($p->amount, 2, ',', '.') }}</div>
+                                        @endforeach
+                                    @elseif($inst->paid_date)
+                                        <strong>{{ $inst->paid_date->format('d/m/Y') }}</strong>
+                                    @elseif($receivable && $receivable->paid_date)
+                                        <strong>{{ $receivable->paid_date->format('d/m/Y') }}</strong>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>{{ $inst->payment_method ?? ($receivable?->payment_method ?? '-') }}</td>
+                                <td><small class="text-muted">{{ \Illuminate\Support\Str::limit($inst->notes ?? '-', 40) }}</small></td>
+                                <td>
+                                    @if($receivable)
+                                        <a href="{{ route('company.receivables.show', $receivable) }}" class="btn btn-sm btn-outline-primary" title="Ver conta a receber"><i class="fas fa-external-link-alt"></i></a>
+                                        @if($receivable->status === 'pending' || $receivable->status === 'partial')
+                                            <a href="{{ route('company.receivables.edit', $receivable) }}" class="btn btn-sm btn-outline-success" title="Registrar pagamento"><i class="fas fa-check"></i></a>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 pt-3 border-top">
+                    <p class="mb-0 small text-muted">
+                        <strong>Resumo:</strong>
+                        Total do contrato: <strong>R$ {{ number_format($contract->value, 2, ',', '.') }}</strong>
+                        • Pago (parcelas): <strong class="text-success">R$ {{ number_format($contract->installments->where('status', 'paid')->sum('value'), 2, ',', '.') }}</strong>
+                        • Pendente: <strong class="text-warning">R$ {{ number_format($contract->installments->where('status', '!=', 'paid')->sum('value'), 2, ',', '.') }}</strong>
+                    </p>
+                </div>
+            @elseif($contract->receivables->count() > 0)
+                {{-- Contrato sem parcelas (ex.: recorrente) – lista contas a receber --}}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Descrição</th>
+                                <th>Valor</th>
+                                <th>Valor pago</th>
+                                <th>Data de vencimento</th>
+                                <th>Status</th>
+                                <th>Data(s) de recebimento</th>
+                                <th>Forma de pagamento</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($contract->receivables->sortBy('due_date') as $rec)
+                            @php
+                                $statusColors = ['pending' => 'warning', 'paid' => 'success', 'partial' => 'info', 'overdue' => 'danger', 'cancelled' => 'secondary'];
+                                $statusLabels = ['pending' => 'Pendente', 'paid' => 'Paga', 'partial' => 'Parcial', 'overdue' => 'Vencida', 'cancelled' => 'Cancelada'];
+                                $statusColor = $statusColors[$rec->status] ?? 'secondary';
+                                $statusLabel = $statusLabels[$rec->status] ?? ucfirst($rec->status);
+                                if ($rec->status === 'partial' && $rec->paid_value) {
+                                    $statusLabel .= ' (' . number_format(($rec->paid_value / $rec->value) * 100, 0) . '%)';
+                                }
+                            @endphp
+                            <tr class="{{ $rec->isOverdue() ? 'table-danger' : '' }}">
+                                <td>{{ $rec->installment_number ? $rec->installment_number . '/' . ($rec->total_installments ?? '-') : $rec->id }}</td>
+                                <td><strong>{{ $rec->description }}</strong></td>
+                                <td><strong>R$ {{ number_format($rec->value, 2, ',', '.') }}</strong></td>
+                                <td>
+                                    @if(($rec->paid_value ?? 0) > 0)
+                                        <strong class="text-success">R$ {{ number_format($rec->paid_value, 2, ',', '.') }}</strong>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    {{ $rec->due_date->format('d/m/Y') }}
+                                    @if($rec->isOverdue())
+                                        <br><small class="text-danger">{{ (int) floor(now()->diffInDays($rec->due_date, false)) }} dias atrasado</small>
+                                    @endif
+                                </td>
+                                <td><span class="badge bg-{{ $statusColor }}">{{ $statusLabel }}</span></td>
+                                <td>
+                                    @if($rec->relationLoaded('payments') && $rec->payments->count() > 0)
+                                        @foreach($rec->payments as $p)
+                                            <div><strong>{{ $p->paid_date->format('d/m/Y') }}</strong> — R$ {{ number_format($p->amount, 2, ',', '.') }}</div>
+                                        @endforeach
+                                    @elseif($rec->paid_date)
+                                        <strong>{{ $rec->paid_date->format('d/m/Y') }}</strong>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>{{ $rec->payment_method ?? '-' }}</td>
+                                <td>
+                                    <a href="{{ route('company.receivables.show', $rec) }}" class="btn btn-sm btn-outline-primary" title="Ver"><i class="fas fa-eye"></i></a>
+                                    @if($rec->status === 'pending' || $rec->status === 'partial')
+                                        <a href="{{ route('company.receivables.edit', $rec) }}" class="btn btn-sm btn-outline-success" title="Registrar pagamento"><i class="fas fa-check"></i></a>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 pt-3 border-top">
+                    <p class="mb-0 small text-muted">
+                        <strong>Resumo:</strong>
+                        Total: <strong>R$ {{ number_format($contract->receivables->sum('value'), 2, ',', '.') }}</strong>
+                        • Pago: <strong class="text-success">R$ {{ number_format($contract->receivables->where('status', 'paid')->sum('value') + $contract->receivables->where('status', 'partial')->sum('paid_value'), 2, ',', '.') }}</strong>
+                        • Pendente: <strong class="text-warning">R$ {{ number_format($contract->receivables->whereIn('status', ['pending', 'partial'])->sum(fn($r) => $r->value - ($r->paid_value ?? 0)), 2, ',', '.') }}</strong>
+                    </p>
+                </div>
+            @else
+                <div class="text-center py-5">
+                    <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-0">Nenhuma parcela ou conta a receber registrada para este contrato.</p>
+                </div>
+            @endif
+        </div>
+    </div>
 </div>
 
 @if($contract->type === 'client_recurring' && $contract->billing_period === 'monthly')

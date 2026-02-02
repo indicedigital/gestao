@@ -11,6 +11,7 @@ use App\Models\Contract;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class ContractController extends Controller
 {
@@ -202,10 +203,17 @@ class ContractController extends Controller
     {
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($contract, $company);
-        
+
+        $contract->load(['installments', 'receivables' => function ($q) {
+            $q->orderBy('due_date')->orderBy('installment_number');
+        }]);
+        if (Schema::hasTable('receivable_payments')) {
+            $contract->load('receivables.payments');
+        }
+
         $clients = Client::where('company_id', $company->id)->where('status', 'active')->get();
         $employees = Employee::where('company_id', $company->id)->where('status', 'active')->get();
-        
+
         return view('company.contracts.edit', compact('contract', 'company', 'clients', 'employees'));
     }
 

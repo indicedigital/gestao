@@ -11,10 +11,12 @@ use App\Models\Expense;
 use App\Models\Payable;
 use App\Models\Project;
 use App\Models\Receivable;
+use App\Models\ReceivablePayment;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -57,11 +59,10 @@ class DashboardController extends Controller
         
         // ========== 1. FINANCEIRO - VISÃO PRINCIPAL ==========
         
-        // Faturamento do mês atual (realizado) - Otimizado com whereBetween
-        $revenueRealized = Receivable::where('company_id', $company->id)
-            ->where('status', 'paid')
-            ->whereBetween('paid_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
-            ->sum('value');
+        // Faturamento do mês atual (realizado) - Soma pelos pagamentos (datas corretas de recebimento)
+        $monthStart = $now->copy()->startOfMonth();
+        $monthEnd = $now->copy()->endOfMonth();
+        $revenueRealized = $this->getRevenueRealizedInPeriod($company->id, $monthStart, $monthEnd);
         
         // Previsão de faturamento do mês atual (contas a receber com vencimento no mês)
         $revenueForecast = Receivable::where('company_id', $company->id)
@@ -80,25 +81,16 @@ class DashboardController extends Controller
             ->whereBetween('paid_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
             ->sum('value');
         
-        // Previsão de despesas do mês atual - Otimizado
+        // Previsão de despesas do mês = só contas a pagar pendentes com vencimento no mês
+        // (a folha de pagamento já é uma conta a pagar; não somar folha estimada em cima para evitar duplicata)
         $expensesForecast = Payable::where('company_id', $company->id)
             ->where('status', 'pending')
             ->whereBetween('due_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
             ->sum('value');
-        
-        // Verifica se a folha já foi paga no mês atual
-        $payrollPaidThisMonth = Payable::where('company_id', $company->id)
-            ->where('type', 'salary')
-            ->where('description', 'like', '%Folha de Pagamento%')
-            ->where('status', 'paid')
-            ->whereBetween('paid_date', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
-            ->sum('value');
-        
-        // Se a folha não foi paga no mês atual, adiciona à previsão
-        if ($payrollPaidThisMonth == 0 && $payrollCache > 0) {
-            $expensesForecast += $payrollCache;
-        }
-        
+
+        $expensesForecastPayablesOnly = $expensesForecast;
+        $expensesForecastPayrollAdded = 0;
+
         $totalExpensesForecast = $expensesRealized + $expensesForecast;
         
         // Principais categorias de despesas - Otimizado
@@ -371,6 +363,9 @@ class DashboardController extends Controller
             'revenueVariation',
             'expensesRealized',
             'expensesForecast',
+            'expensesForecastPayablesOnly',
+            'expensesForecastPayrollAdded',
+            'payrollCache',
             'totalExpensesForecast',
             'expensesByCategory',
             'profitRealized',
@@ -521,6 +516,25 @@ class DashboardController extends Controller
         return $expensesByCategoryChart->sortByDesc('value')->values();
     }
 
+    /**
+     * Faturamento realizado em um período (soma pelas datas de pagamento em receivable_payments).
+     * Usa receivable_payments para refletir as datas corretas de cada recebimento (parcial ou total).
+     */
+    protected function getRevenueRealizedInPeriod(int $companyId, Carbon $start, Carbon $end): float
+    {
+        if (! Schema::hasTable('receivable_payments')) {
+            return (float) Receivable::where('company_id', $companyId)
+                ->where('status', 'paid')
+                ->whereBetween('paid_date', [$start, $end])
+                ->sum('value');
+        }
+        return (float) ReceivablePayment::whereHas('receivable', function ($q) use ($companyId) {
+            $q->where('company_id', $companyId);
+        })
+            ->whereBetween('paid_date', [$start, $end])
+            ->sum('amount');
+    }
+
     protected function getFinancialHistory(Company $company, int $months = 6): array
     {
         $history = [];
@@ -530,22 +544,20 @@ class DashboardController extends Controller
             $monthStart = $date->copy()->startOfMonth();
             $monthEnd = $date->copy()->endOfMonth();
             $monthName = $date->format('M/Y');
-            
-            $receivables = Receivable::where('company_id', $company->id)
-                ->where('status', 'paid')
-                ->whereBetween('paid_date', [$monthStart, $monthEnd])
-                ->sum('value');
-            
+
+            // Receita realizada = soma dos pagamentos pela data de recebimento (receivable_payments)
+            $revenue = $this->getRevenueRealizedInPeriod($company->id, $monthStart, $monthEnd);
+
             $payables = Payable::where('company_id', $company->id)
                 ->where('status', 'paid')
                 ->whereBetween('paid_date', [$monthStart, $monthEnd])
                 ->sum('value');
-            
+
             $history[] = [
                 'month' => $monthName,
-                'revenue' => $receivables,
+                'revenue' => $revenue,
                 'expenses' => $payables,
-                'profit' => $receivables - $payables,
+                'profit' => $revenue - $payables,
             ];
         }
         

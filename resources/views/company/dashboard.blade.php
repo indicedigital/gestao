@@ -256,7 +256,7 @@
                         <h3>R$ {{ number_format($expensesRealized, 2, ',', '.') }}</h3>
                     </div>
                     <div class="bg-danger bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-chart-line-down fa-lg text-danger"></i>
+                        <i class="fas fa-arrow-trend-down fa-lg text-danger"></i>
                     </div>
                 </div>
                 <div class="d-flex align-items-center justify-content-between">
@@ -271,6 +271,8 @@
                         </span>
                     @endif
                 </div>
+                <p class="mb-0 mt-1 small text-muted" style="font-size: 11px;">
+                </p>
             </div>
         </div>
 

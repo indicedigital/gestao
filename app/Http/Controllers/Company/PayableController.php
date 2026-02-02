@@ -163,21 +163,40 @@ class PayableController extends Controller
     {
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($payable, $company);
-        
-        $validated = $request->validate([
-            'employee_id' => 'nullable|exists:employees,id',
-            'project_id' => 'nullable|exists:projects,id',
-            'type' => 'required|in:salary,service,supplier,other',
-            'category' => 'nullable|in:clt,pj,supplier,recurring',
-            'description' => 'required|string|max:255',
-            'value' => 'required|numeric|min:0',
-            'due_date' => 'required|date',
-            'status' => 'nullable|in:pending,paid,overdue,cancelled',
-            'paid_date' => 'required_if:status,paid|nullable|date',
-            'payment_method' => 'nullable|string|max:50',
-            'supplier_name' => 'nullable|string|max:255',
-            'notes' => 'nullable|string',
+
+        // Normaliza valor monetário (formato brasileiro ou número)
+        $request->merge([
+            'value' => $this->normalizeMoney($request->input('value'), $payable->value),
         ]);
+
+        try {
+            $validated = $request->validate([
+                'employee_id' => 'nullable|exists:employees,id',
+                'project_id' => 'nullable|exists:projects,id',
+                'type' => 'required|in:salary,service,supplier,other',
+                'category' => 'nullable|in:clt,pj,supplier,recurring',
+                'description' => 'required|string|max:255',
+                'value' => 'required|numeric|min:0',
+                'due_date' => 'required|date',
+                'status' => 'nullable|in:pending,paid,overdue,cancelled',
+                'paid_date' => 'required_if:status,paid|nullable|date',
+                'payment_method' => 'nullable|string|max:50',
+                'supplier_name' => 'nullable|string|max:255',
+                'notes' => 'nullable|string',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
+        }
+
+        // Preserva employee_id e project_id quando não enviados no formulário
+        if (! $request->has('employee_id')) {
+            $validated['employee_id'] = $payable->employee_id;
+        }
+        if (! $request->has('project_id')) {
+            $validated['project_id'] = $payable->project_id;
+        }
 
         // Se status for paid e não tiver paid_date, define como hoje
         if (($validated['status'] ?? $payable->status) === 'paid' && empty($validated['paid_date'])) {
@@ -222,5 +241,22 @@ class PayableController extends Controller
         if ($payable->company_id !== $company->id) {
             abort(403, 'Acesso negado.');
         }
+    }
+
+    /**
+     * Converte valor monetário em formato brasileiro (1.234,56) para numérico.
+     */
+    protected function normalizeMoney(mixed $value, mixed $fallback = null): ?float
+    {
+        if ($value === null || $value === '') {
+            return $fallback !== null ? (float) $fallback : null;
+        }
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+        $str = preg_replace('/\s+/', '', (string) $value);
+        $str = str_replace('.', '', $str);
+        $str = str_replace(',', '.', $str);
+        return $str !== '' ? (float) $str : ($fallback !== null ? (float) $fallback : null);
     }
 }

@@ -16,6 +16,17 @@
 
     <div class="card shadow">
         <div class="card-body">
+            @if($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong><i class="fas fa-exclamation-circle me-2"></i>Corrija os erros abaixo:</strong>
+                    <ul class="mb-0 mt-2">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                </div>
+            @endif
             <form action="{{ route('company.receivables.update', $receivable) }}" method="POST">
                 @csrf
                 @method('PUT')
@@ -109,51 +120,6 @@
                         @enderror
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="status" class="form-label">Status</label>
-                        <select class="form-select @error('status') is-invalid @enderror" id="status" name="status" onchange="togglePaidFields()">
-                            <option value="pending" {{ old('status', $receivable->status) === 'pending' ? 'selected' : '' }}>Pendente</option>
-                            <option value="paid" {{ old('status', $receivable->status) === 'paid' ? 'selected' : '' }}>Paga</option>
-                            <option value="partial" {{ old('status', $receivable->status) === 'partial' ? 'selected' : '' }}>Parcial</option>
-                            <option value="overdue" {{ old('status', $receivable->status) === 'overdue' ? 'selected' : '' }}>Vencida</option>
-                            <option value="cancelled" {{ old('status', $receivable->status) === 'cancelled' ? 'selected' : '' }}>Cancelada</option>
-                        </select>
-                        @error('status')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
-                <div class="row" id="paid-date-row" style="display: {{ in_array(old('status', $receivable->status), ['paid', 'partial']) ? 'flex' : 'none' }};">
-                    <div class="col-md-4 mb-3">
-                        <label for="paid_date" class="form-label">Data de Pagamento <span class="text-danger">*</span></label>
-                        <input type="date" class="form-control @error('paid_date') is-invalid @enderror" id="paid_date" name="paid_date" value="{{ old('paid_date', $receivable->paid_date ? $receivable->paid_date->format('Y-m-d') : '') }}">
-                        @error('paid_date')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="col-md-4 mb-3" id="paid-value-row" style="display: {{ (old('status', $receivable->status) === 'partial') ? 'block' : 'none' }};">
-                        <label for="paid_value" class="form-label">Valor Pago <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text">R$</span>
-                            <input type="text" class="form-control money-mask @error('paid_value') is-invalid @enderror" id="paid_value" name="paid_value" value="{{ old('paid_value', $receivable->paid_value ? number_format($receivable->paid_value, 2, ',', '.') : '') }}">
-                        </div>
-                        <small class="text-muted">Valor total: R$ {{ number_format($receivable->value, 2, ',', '.') }}</small>
-                        @error('paid_value')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="col-md-4 mb-3">
-                        <label for="payment_method" class="form-label">Forma de Pagamento</label>
-                        <input type="text" class="form-control @error('payment_method') is-invalid @enderror" id="payment_method" name="payment_method" value="{{ old('payment_method', $receivable->payment_method) }}">
-                        @error('payment_method')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
                 <div class="mb-3">
                     <label for="notes" class="form-label">Observações</label>
                     <textarea class="form-control @error('notes') is-invalid @enderror" id="notes" name="notes" rows="3">{{ old('notes', $receivable->notes) }}</textarea>
@@ -169,35 +135,109 @@
             </form>
         </div>
     </div>
+
+    {{-- Pagamentos registrados (múltiplas datas) --}}
+    <div class="card shadow mt-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fas fa-list me-2"></i>Pagamentos registrados</h6>
+        </div>
+        <div class="card-body">
+            @if($receivable->payments->count() > 0)
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Data do recebimento</th>
+                                <th>Valor</th>
+                                <th>Forma de pagamento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($receivable->payments as $i => $p)
+                            <tr>
+                                <td>{{ $i + 1 }}</td>
+                                <td>{{ $p->paid_date->format('d/m/Y') }}</td>
+                                <td><strong>R$ {{ number_format($p->amount, 2, ',', '.') }}</strong></td>
+                                <td>{{ $p->payment_method ?? '-' }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mb-0 text-muted small">
+                    Total pago: <strong>R$ {{ number_format($receivable->paid_value ?? 0, 2, ',', '.') }}</strong>
+                    @if((float)($receivable->value - ($receivable->paid_value ?? 0)) > 0)
+                        • Restante: <strong class="text-warning">R$ {{ number_format($receivable->value - ($receivable->paid_value ?? 0), 2, ',', '.') }}</strong>
+                    @endif
+                </p>
+            @else
+                <p class="text-muted mb-0">Nenhum pagamento registrado nesta conta.</p>
+            @endif
+        </div>
+    </div>
+
+    {{-- Adicionar novo pagamento (parcial ou total) --}}
+    @if($receivable->status !== 'paid' && (float)($receivable->value - ($receivable->paid_value ?? 0)) > 0)
+    <div class="card shadow mt-4">
+        <div class="card-header bg-success text-white">
+            <h6 class="mb-0"><i class="fas fa-plus me-2"></i>Registrar novo pagamento (parcial ou total)</h6>
+        </div>
+        <div class="card-body">
+            <form action="{{ route('company.receivables.mark-as-paid', $receivable) }}" method="POST" class="row g-3">
+                @csrf
+                <div class="col-md-3">
+                    <label for="add_paid_date" class="form-label">Data do recebimento <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control" id="add_paid_date" name="paid_date" value="{{ date('Y-m-d') }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="add_paid_value" class="form-label">Valor <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="text" class="form-control add-payment-mask" id="add_paid_value" name="paid_value" placeholder="0,00" required>
+                    </div>
+                    <small class="text-muted">Máx. R$ {{ number_format($receivable->value - ($receivable->paid_value ?? 0), 2, ',', '.') }}</small>
+                </div>
+                <div class="col-md-3">
+                    <label for="add_payment_method" class="form-label">Forma de pagamento</label>
+                    <input type="text" class="form-control" id="add_payment_method" name="payment_method" placeholder="PIX, Boleto...">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="partial_payment" value="1" id="add_partial" checked>
+                        <label class="form-check-label" for="add_partial">Pagamento parcial</label>
+                    </div>
+                    <button type="submit" class="btn btn-success ms-2"><i class="fas fa-check me-1"></i>Registrar</button>
+                </div>
+            </form>
+            <p class="text-muted small mt-2 mb-0">
+                Se o valor for menor que o restante, será criada automaticamente uma <strong>duplicata pendente</strong> para o valor restante, com outra data de vencimento.
+            </p>
+        </div>
+    </div>
+    @endif
+
+    @if($receivable->remainderReceivable)
+    <div class="card shadow mt-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h6 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Duplicata do restante</h6>
+        </div>
+        <div class="card-body">
+            <p class="mb-2">Foi criada uma conta a receber para o valor restante:</p>
+            <p class="mb-0">
+                <a href="{{ route('company.receivables.show', $receivable->remainderReceivable) }}" class="btn btn-outline-primary btn-sm">
+                    Ver duplicata #{{ $receivable->remainderReceivable->id }} — R$ {{ number_format($receivable->remainderReceivable->value, 2, ',', '.') }} (venc. {{ $receivable->remainderReceivable->due_date->format('d/m/Y') }})
+                </a>
+            </p>
+        </div>
+    </div>
+    @endif
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
 <script>
-function togglePaidFields() {
-    const status = document.getElementById('status').value;
-    const paidDateRow = document.getElementById('paid-date-row');
-    const paidValueRow = document.getElementById('paid-value-row');
-    const paidValueInput = document.getElementById('paid_value');
-    
-    if (status === 'paid' || status === 'partial') {
-        paidDateRow.style.display = 'flex';
-        if (status === 'partial') {
-            paidValueRow.style.display = 'block';
-            paidValueInput.required = true;
-        } else {
-            paidValueRow.style.display = 'none';
-            paidValueInput.required = false;
-        }
-    } else {
-        paidDateRow.style.display = 'none';
-        paidValueRow.style.display = 'none';
-        paidValueInput.required = false;
-    }
-}
-
-// Aplica máscara de dinheiro
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.money-mask').forEach(function(input) {
+    document.querySelectorAll('.money-mask, .add-payment-mask').forEach(function(input) {
         new Cleave(input, {
             numeral: true,
             numeralDecimalMark: ',',
@@ -205,8 +245,6 @@ document.addEventListener('DOMContentLoaded', function() {
             numeralDecimalScale: 2
         });
     });
-    
-    togglePaidFields();
 });
 </script>
 @endsection
