@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CompanyController extends Controller
@@ -38,6 +39,7 @@ class CompanyController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
+            'logo' => 'nullable|file|max:2048|mimes:jpeg,jpg,png,webp,svg',
             'status' => 'nullable|in:active,suspended,cancelled',
             'owner_id' => 'nullable|exists:users,id',
         ]);
@@ -47,7 +49,14 @@ class CompanyController extends Controller
             $validated['status'] = 'active';
         }
 
+        unset($validated['logo']);
         $company = Company::create($validated);
+
+        if ($request->hasFile('logo')) {
+            $company->update([
+                'logo_path' => $request->file('logo')->store('company-logos', 'public'),
+            ]);
+        }
 
         // Se tiver owner, vincula como admin
         if (isset($validated['owner_id'])) {
@@ -89,12 +98,22 @@ class CompanyController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
+            'logo' => 'nullable|file|max:2048|mimes:jpeg,jpg,png,webp,svg',
             'status' => 'nullable|in:active,suspended,cancelled',
             'owner_id' => 'nullable|exists:users,id',
         ]);
 
         if (isset($validated['name']) && $validated['name'] !== $company->name) {
             $validated['slug'] = Str::slug($validated['name']);
+        }
+
+        unset($validated['logo']);
+
+        if ($request->hasFile('logo')) {
+            if ($company->logo_path && Storage::disk('public')->exists($company->logo_path)) {
+                Storage::disk('public')->delete($company->logo_path);
+            }
+            $validated['logo_path'] = $request->file('logo')->store('company-logos', 'public');
         }
 
         // Atualiza owner se mudou

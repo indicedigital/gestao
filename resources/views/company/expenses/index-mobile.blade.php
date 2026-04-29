@@ -3,16 +3,17 @@
 @section('title', 'Despesas')
 
 @section('content')
+@php $evoYear = (int) substr($monthInput, 0, 4); @endphp
 <div class="mobile-content">
     <!-- Tabs -->
     <div class="mobile-card" style="margin-bottom: 16px;">
         <div style="display: flex; gap: 8px; border-bottom: 2px solid #e2e8f0;">
-            <a href="{{ route('company.expenses.index', ['type' => 'fixed']) }}" 
+            <a href="{{ route('company.expenses.index', $tabQueryFixed) }}" 
                class="btn {{ $type === 'fixed' ? 'btn-primary' : 'btn-outline-primary' }}" 
                style="flex: 1; padding: 10px; border-radius: 8px 8px 0 0; font-size: 13px; text-align: center; text-decoration: none; border: none; border-bottom: 3px solid {{ $type === 'fixed' ? '#5e72e4' : 'transparent' }};">
                 Fixas ({{ $fixedCount }})
             </a>
-            <a href="{{ route('company.expenses.index', ['type' => 'variable']) }}" 
+            <a href="{{ route('company.expenses.index', $tabQueryVariable) }}" 
                class="btn {{ $type === 'variable' ? 'btn-primary' : 'btn-outline-primary' }}" 
                style="flex: 1; padding: 10px; border-radius: 8px 8px 0 0; font-size: 13px; text-align: center; text-decoration: none; border: none; border-bottom: 3px solid {{ $type === 'variable' ? '#5e72e4' : 'transparent' }};">
                 Variáveis ({{ $variableCount }})
@@ -28,6 +29,108 @@
             <i class="fas fa-plus"></i> Nova Despesa
         </a>
     </div>
+
+    <!-- Filtro categoria -->
+    <div class="mobile-card" style="margin-bottom: 16px;">
+        <form method="get" action="{{ route('company.expenses.index') }}">
+            <input type="hidden" name="type" value="{{ $type }}">
+            <label class="form-label small text-muted mb-1">Mês (vencimento)</label>
+            <input type="month" name="month" class="form-control form-control-sm mb-2" value="{{ $monthInput }}" onchange="this.form.submit()">
+            <label class="form-label small text-muted mb-1">Categoria</label>
+            <select name="category_id" class="form-select form-select-sm mb-2" onchange="this.form.submit()">
+                <option value="" @selected($selectedCategoryKey === '')>Todas</option>
+                @if($hasUncategorized)
+                    <option value="none" @selected($selectedCategoryKey === 'none')>Sem categoria</option>
+                @endif
+                @foreach($filterCategories as $cat)
+                    <option value="{{ $cat->id }}" @selected($selectedCategoryKey === (string) $cat->id)>{{ $cat->name }}</option>
+                @endforeach
+            </select>
+            @if($hasCategoryFilter)
+                <a href="{{ route('company.expenses.index', ['type' => $type, 'month' => $monthInput]) }}" class="small">Limpar categoria</a>
+            @endif
+        </form>
+    </div>
+
+    <!-- KPIs (acompanham filtro) -->
+    <div class="mobile-card" style="margin-bottom: 16px;">
+        <p class="small text-muted mb-2" style="margin: 0;">{{ ucfirst($selectedMonthLabel) }} — totais com filtros (lista completa)</p>
+        <p class="small text-primary mb-2" style="margin: 0;"><i class="fas fa-chart-line me-1"></i>Toque nos cards para evolução no ano.</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="expense-kpi-trigger" tabindex="0" role="button"
+                 data-expense-evolution="sum"
+                 data-evolution-year="{{ $evoYear }}"
+                 data-evolution-type="{{ $type }}"
+                 data-category-id="{{ $selectedCategoryKey }}"
+                 data-evolution-title="Soma — {{ $type === 'fixed' ? 'Fixas' : 'Variáveis' }} ({{ $evoYear }})"
+                 style="cursor:pointer;background: #ecfdf5; border-radius: 10px; padding: 12px; border: 1px solid #a7f3d0;">
+                <div style="font-size: 10px; color: #047857; font-weight: 600; text-transform: uppercase;">Soma</div>
+                <div style="font-size: 15px; font-weight: 700; color: #065f46;">R$ {{ number_format($filteredTotal, 2, ',', '.') }}</div>
+            </div>
+            <div class="expense-kpi-trigger" tabindex="0" role="button"
+                 data-expense-evolution="count"
+                 data-evolution-year="{{ $evoYear }}"
+                 data-evolution-type="{{ $type }}"
+                 data-category-id="{{ $selectedCategoryKey }}"
+                 data-evolution-title="Lançamentos ({{ $evoYear }})"
+                 style="cursor:pointer;background: #eef2ff; border-radius: 10px; padding: 12px; border: 1px solid #c7d2fe;">
+                <div style="font-size: 10px; color: #4338ca; font-weight: 600; text-transform: uppercase;">Lançamentos</div>
+                <div style="font-size: 15px; font-weight: 700; color: #3730a3;">{{ $filteredCount }}</div>
+            </div>
+            <div class="expense-kpi-trigger" tabindex="0" role="button"
+                 data-expense-evolution="average"
+                 data-evolution-year="{{ $evoYear }}"
+                 data-evolution-type="{{ $type }}"
+                 data-category-id="{{ $selectedCategoryKey }}"
+                 data-evolution-title="Média ({{ $evoYear }})"
+                 style="cursor:pointer;background: #ecfeff; border-radius: 10px; padding: 12px; border: 1px solid #a5f3fc;">
+                <div style="font-size: 10px; color: #0e7490; font-weight: 600; text-transform: uppercase;">Média</div>
+                <div style="font-size: 14px; font-weight: 700; color: #155e75;">R$ {{ number_format($filteredAverage, 2, ',', '.') }}</div>
+            </div>
+            <div class="expense-kpi-trigger" tabindex="0" role="button"
+                 data-expense-evolution="{{ $hasCategoryFilter && $typeTotal > 0 ? 'share' : 'type_total' }}"
+                 data-evolution-year="{{ $evoYear }}"
+                 data-evolution-type="{{ $type }}"
+                 data-category-id="{{ $selectedCategoryKey }}"
+                 data-evolution-title="{{ $hasCategoryFilter && $typeTotal > 0 ? 'Participação % ('.$evoYear.')' : 'Total do tipo ('.$evoYear.')' }}"
+                 style="background: #fff7ed; border-radius: 10px; padding: 12px; border: 1px solid #fed7aa;">
+                <div style="font-size: 10px; color: #c2410c; font-weight: 600; text-transform: uppercase;">
+                    {{ $hasCategoryFilter && $typeTotal > 0 ? '% no tipo' : 'Grupos' }}</div>
+                <div style="font-size: 15px; font-weight: 700; color: #9a3412;">
+                    @if($hasCategoryFilter && $typeTotal > 0)
+                        {{ number_format(($filteredTotal / $typeTotal) * 100, 1, ',', '.') }}%
+                    @else
+                        {{ $categoryBreakdown->count() }}
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if($categoryBreakdown->isNotEmpty())
+    <div class="mobile-card" style="margin-bottom: 12px; padding: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Por categoria</span>
+            <span style="font-size: 11px; color: #94a3b8;">{{ $type === 'fixed' ? 'Fixas' : 'Variáveis' }}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            @foreach($categoryBreakdown as $row)
+            <div class="expense-kpi-trigger" tabindex="0" role="button"
+                 data-expense-evolution="category"
+                 data-evolution-year="{{ $evoYear }}"
+                 data-evolution-type="{{ $type }}"
+                 data-category-id="{{ $row['id'] === null ? 'none' : $row['id'] }}"
+                 data-evolution-title="Evolução: {{ $row['name'] }} ({{ $evoYear }})"
+                 style="cursor:pointer;border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fafbfc;">
+                <span class="badge text-truncate d-inline-block mb-1" style="max-width: 100%; font-size: 10px; background-color: {{ $row['color'] }};" title="{{ $row['name'] }}">{{ $row['name'] }}</span>
+                <div style="font-weight: 700; font-size: 13px; color: #1a202c;">R$ {{ number_format($row['total'], 2, ',', '.') }}</div>
+                <div style="font-size: 10px; color: #64748b;">{{ $row['count'] }} lanç.</div>
+                <a href="{{ route('company.expenses.index', ['type' => $type, 'month' => $monthInput, 'category_id' => $row['id'] === null ? 'none' : $row['id']]) }}" style="font-size: 11px;" onclick="event.stopPropagation()">Filtrar</a>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 
     <!-- Lista de Despesas -->
     <div class="mobile-card">
@@ -121,4 +224,6 @@
         @endif
     </div>
 </div>
+
+@include('company.expenses.partials.evolution-modal')
 @endsection

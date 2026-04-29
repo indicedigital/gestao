@@ -22,4 +22,9 @@ class ReceivablePayment extends Model
     {
         return $this->belongsTo(Receivable::class);
     }
+
+    public function fiscalExitNote()
+    {
+        return $this->hasOne(FiscalExitNote::class, 'receivable_payment_id');
+    }
 }

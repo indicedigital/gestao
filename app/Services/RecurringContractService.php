@@ -154,8 +154,8 @@ class RecurringContractService
             'errors' => []
         ];
         
-        $currentMonth = now()->startOfMonth();
-        $nextMonth = now()->addMonth()->startOfMonth();
+        $currentMonth = now()->copy()->startOfMonth();
+        $nextMonth = $currentMonth->copy()->addMonth();
         
         // Busca todos os contratos recorrentes ativos
         $contracts = Contract::where('type', 'client_recurring')

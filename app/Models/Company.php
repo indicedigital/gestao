@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Company extends Model
 {
@@ -11,9 +12,47 @@ class Company extends Model
         'slug',
         'email',
         'phone',
+        'logo_path',
         'status',
         'owner_id',
     ];
+
+    /**
+     * URL pública do logotipo (disco public), ou null.
+     */
+    public function logoPublicUrl(): ?string
+    {
+        if (! $this->logo_path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->logo_path);
+    }
+
+    /**
+     * Iniciais para exibição quando não há logo.
+     */
+    public function logoInitials(): string
+    {
+        $name = trim((string) $this->name);
+        if ($name === '') {
+            return '?';
+        }
+        $parts = preg_split('/\s+/u', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (function_exists('mb_strtoupper')) {
+            if (count($parts) === 1) {
+                return mb_strtoupper(mb_substr($parts[0], 0, 2));
+            }
+
+            return mb_strtoupper(mb_substr($parts[0], 0, 1).mb_substr($parts[count($parts) - 1], 0, 1));
+        }
+
+        if (count($parts) === 1) {
+            return strtoupper(substr($parts[0], 0, 2));
+        }
+
+        return strtoupper(substr($parts[0], 0, 1).substr($parts[count($parts) - 1], 0, 1));
+    }
 
     /**
      * Owner da empresa
@@ -95,5 +134,18 @@ class Company extends Model
     public function payables()
     {
         return $this->hasMany(Payable::class);
+    }
+
+    /**
+     * Lançamentos de notas fiscais de entrada (contabilidade)
+     */
+    public function fiscalEntryNotes()
+    {
+        return $this->hasMany(FiscalEntryNote::class);
+    }
+
+    public function fiscalExitNotes()
+    {
+        return $this->hasMany(FiscalExitNote::class);
     }
 }

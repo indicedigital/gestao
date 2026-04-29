@@ -16,6 +16,18 @@
 
     <div class="card shadow">
         <div class="card-body">
+            @if($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong><i class="fas fa-exclamation-triangle me-2"></i>Corrija os erros abaixo:</strong>
+                    <ul class="mb-0 mt-2">
+                        @foreach($errors->all() as $err)
+                            <li>{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                </div>
+            @endif
+
             <form action="{{ route('company.contracts.update', $contract) }}" method="POST">
                 @csrf
                 @method('PUT')
@@ -35,6 +47,34 @@
                         @enderror
                     </div>
 
+                    <div class="col-md-6 mb-3" id="client_id_wrap" style="display: {{ in_array(old('type', $contract->type), ['client_recurring', 'client_fixed']) ? 'block' : 'none' }};">
+                        <label for="client_id" class="form-label">Cliente <span class="text-danger">*</span></label>
+                        <select class="form-select @error('client_id') is-invalid @enderror" id="client_id" name="client_id">
+                            <option value="">Selecione o cliente</option>
+                            @foreach($clients ?? [] as $c)
+                                <option value="{{ $c->id }}" {{ old('client_id', $contract->client_id) == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('client_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="col-md-6 mb-3" id="employee_id_wrap" style="display: {{ in_array(old('type', $contract->type), ['employee_clt', 'employee_pj']) ? 'block' : 'none' }};">
+                        <label for="employee_id" class="form-label">Funcionário <span class="text-danger">*</span></label>
+                        <select class="form-select @error('employee_id') is-invalid @enderror" id="employee_id" name="employee_id">
+                            <option value="">Selecione o funcionário</option>
+                            @foreach($employees ?? [] as $e)
+                                <option value="{{ $e->id }}" {{ old('employee_id', $contract->employee_id) == $e->id ? 'selected' : '' }}>{{ $e->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('employee_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="name" class="form-label">Nome do Contrato <span class="text-danger">*</span></label>
                         <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name', $contract->name) }}" required>
@@ -321,6 +361,40 @@
     </div>
 </div>
 
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var typeSelect = document.getElementById('type');
+        var clientWrap = document.getElementById('client_id_wrap');
+        var employeeWrap = document.getElementById('employee_id_wrap');
+        var clientSelect = document.getElementById('client_id');
+        var employeeSelect = document.getElementById('employee_id');
+
+        function toggleClientEmployee() {
+            if (!typeSelect) return;
+            var v = typeSelect.value;
+            var isClient = (v === 'client_recurring' || v === 'client_fixed');
+            var isEmployee = (v === 'employee_clt' || v === 'employee_pj');
+            if (clientWrap) {
+                clientWrap.style.display = isClient ? 'block' : 'none';
+                if (clientSelect) {
+                    clientSelect.required = isClient;
+                    if (!isClient) clientSelect.value = '';
+                }
+            }
+            if (employeeWrap) {
+                employeeWrap.style.display = isEmployee ? 'block' : 'none';
+                if (employeeSelect) {
+                    employeeSelect.required = isEmployee;
+                    if (!isEmployee) employeeSelect.value = '';
+                }
+            }
+        }
+        if (typeSelect) typeSelect.addEventListener('change', toggleClientEmployee);
+        toggleClientEmployee();
+    });
+</script>
+@endpush
 @if($contract->type === 'client_recurring' && $contract->billing_period === 'monthly')
 @push('scripts')
 <script>

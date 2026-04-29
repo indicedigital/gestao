@@ -10,7 +10,7 @@
 
 <div class="card">
     <div class="card-body">
-        <form method="POST" action="{{ route('admin.companies.update', $company) }}">
+        <form method="POST" action="{{ route('admin.companies.update', $company) }}" enctype="multipart/form-data">
             @csrf
             @method('PUT')
             
@@ -52,6 +52,26 @@
                 </div>
             </div>
             
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <label for="logo" class="form-label">
+                        <i class="fas fa-image me-2"></i>Logotipo (relatórios e impressos)
+                    </label>
+                    <input type="file" class="form-control @error('logo') is-invalid @enderror" id="logo" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml">
+                    @error('logo')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    @if($company->logo_path)
+                        <div class="mt-2 d-flex align-items-center gap-2">
+                            <img src="{{ $company->logoPublicUrl() }}" alt="Logo atual" style="max-height: 48px; max-width: 160px; object-fit: contain;">
+                            <small class="text-muted">Envie um novo arquivo para substituir.</small>
+                        </div>
+                    @else
+                        <small class="form-text text-muted">PNG, JPG ou WebP até 2 MB. Aparece no relatório fiscal da empresa.</small>
+                    @endif
+                </div>
+            </div>
+
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label for="phone" class="form-label">

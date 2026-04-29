@@ -93,6 +93,14 @@ class Receivable extends Model
     }
 
     /**
+     * Notas fiscais de saída (vinculadas aos recebimentos / parcelas).
+     */
+    public function fiscalExitNotes()
+    {
+        return $this->hasMany(FiscalExitNote::class);
+    }
+
+    /**
      * Verifica se está vencida
      */
     public function isOverdue(): bool
@@ -114,13 +122,15 @@ class Receivable extends Model
             return null;
         }
 
-        $this->payments()->create([
+        $payment = $this->payments()->create([
             'amount' => $paidValue,
             'paid_date' => $paidDate,
             'payment_method' => $paymentMethod ?? $this->payment_method,
         ]);
 
         $this->syncPaidFromPayments();
+
+        FiscalExitNote::createFromReceivablePayment($payment);
 
         $remainder = (float) $this->value - (float) $this->paid_value;
         if ($remainder > 0 && $createRemainderDuplicata && ! $this->remainderReceivable()->exists()) {

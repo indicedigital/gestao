@@ -152,7 +152,7 @@ class ReceivableController extends Controller
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
         
-        $receivable->load('client', 'project', 'contract', 'payments', 'remainderReceivable');
+        $receivable->load('client', 'project', 'contract', 'payments', 'remainderReceivable', 'fiscalExitNotes');
         return view('company.receivables.show', compact('receivable', 'company'));
     }
 

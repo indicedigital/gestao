@@ -10,7 +10,7 @@
 
 <div class="card">
     <div class="card-body">
-        <form method="POST" action="{{ route('admin.companies.store') }}">
+        <form method="POST" action="{{ route('admin.companies.store') }}" enctype="multipart/form-data">
             @csrf
             
             <div class="row">
@@ -51,6 +51,19 @@
                 </div>
             </div>
             
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <label for="logo" class="form-label">
+                        <i class="fas fa-image me-2"></i>Logotipo (opcional)
+                    </label>
+                    <input type="file" class="form-control @error('logo') is-invalid @enderror" id="logo" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml">
+                    @error('logo')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <small class="form-text text-muted">PNG, JPG ou WebP até 2 MB. Usado no relatório fiscal impresso.</small>
+                </div>
+            </div>
+
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label for="phone" class="form-label">

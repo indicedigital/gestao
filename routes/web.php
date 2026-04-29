@@ -19,6 +19,9 @@ use App\Http\Controllers\Company\ExpenseController;
 use App\Http\Controllers\Company\ExpenseCategoryController;
 use App\Http\Controllers\Company\NotificationController;
 use App\Http\Controllers\Company\SupplierController;
+use App\Http\Controllers\Company\FiscalEntryNoteController;
+use App\Http\Controllers\Company\FiscalExitNoteController;
+use App\Http\Controllers\Company\AccountingReportController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
@@ -113,7 +116,8 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
            Route::resource('employees', EmployeeController::class);
            Route::post('employees/generate-payroll', [EmployeeController::class, 'generatePayroll'])->name('employees.generate-payroll');
            
-           // Despesas
+           // Despesas (rota específica antes do resource para não conflitar com {expense})
+           Route::get('expenses/monthly-evolution', [ExpenseController::class, 'monthlyEvolution'])->name('expenses.monthly-evolution');
            Route::resource('expenses', ExpenseController::class);
            
            // Fornecedores
@@ -121,6 +125,17 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
            
            // Categorias de Despesas (Configurações)
            Route::resource('expense-categories', ExpenseCategoryController::class);
+
+           // Contabilidade
+           Route::prefix('accounting')->name('accounting.')->group(function () {
+               Route::get('report', [AccountingReportController::class, 'monthly'])->name('report');
+               Route::get('fiscal-entry-notes/report', [FiscalEntryNoteController::class, 'monthlyReport'])->name('fiscal-entry-notes.report');
+               Route::post('fiscal-entry-notes/{fiscal_entry_note}/toggle-issued', [FiscalEntryNoteController::class, 'toggleIssued'])->name('fiscal-entry-notes.toggle-issued');
+               Route::resource('fiscal-entry-notes', FiscalEntryNoteController::class)->except(['show']);
+               Route::post('fiscal-exit-notes/sync-from-receivables', [FiscalExitNoteController::class, 'syncFromReceivables'])->name('fiscal-exit-notes.sync-from-receivables');
+               Route::post('fiscal-exit-notes/{fiscal_exit_note}/toggle-issued', [FiscalExitNoteController::class, 'toggleIssued'])->name('fiscal-exit-notes.toggle-issued');
+               Route::resource('fiscal-exit-notes', FiscalExitNoteController::class)->only(['index', 'edit', 'update', 'destroy']);
+           });
 });
 
 // Rotas de Admin (requer autenticação e verificação de e-mail)

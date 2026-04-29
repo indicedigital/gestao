@@ -367,6 +367,52 @@
         </div>
     </div>
 
+    @if($receivable->fiscalExitNotes->isNotEmpty())
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card-modern">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0 font-weight-bold"><i class="fas fa-file-export me-2 text-primary"></i>Notas fiscais de saída (recebimentos)</h6>
+                    <a href="{{ route('company.accounting.fiscal-exit-notes.index') }}" class="btn btn-sm btn-outline-primary">Ver todas</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data recebimento</th>
+                                    <th class="text-end">Valor</th>
+                                    <th>Status NF</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($receivable->fiscalExitNotes as $fen)
+                                    <tr>
+                                        <td>{{ $fen->received_date->format('d/m/Y') }}</td>
+                                        <td class="text-end">R$ {{ number_format($fen->amount_received, 2, ',', '.') }}</td>
+                                        <td>
+                                            @if($fen->is_issued)
+                                                <span class="badge bg-success">Emitida</span>
+                                                @if($fen->issued_at)<small class="text-muted ms-1">{{ $fen->issued_at->format('d/m/Y') }}</small>@endif
+                                            @else
+                                                <span class="badge bg-warning text-dark">Pendente</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="{{ route('company.accounting.fiscal-exit-notes.edit', $fen) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Relacionamentos -->
     <div class="row mb-4">
         @if($receivable->contract)

@@ -349,7 +349,7 @@ class ClientController extends Controller
         // Histórico mensal (últimos 12 meses)
         $monthlyHistory = [];
         for ($i = 11; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
+            $date = now()->copy()->startOfMonth()->subMonths($i);
             $monthStart = $date->copy()->startOfMonth();
             $monthEnd = $date->copy()->endOfMonth();
             

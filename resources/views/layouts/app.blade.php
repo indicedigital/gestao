@@ -977,6 +977,17 @@
             
             /* Tables remain visible on desktop layout */
         }
+
+        /* Impressão / exportar PDF: esconder navegação fixa do rodapé (mobile) */
+        @media print {
+            .bottom-nav-mobile {
+                display: none !important;
+                visibility: hidden !important;
+            }
+            body {
+                padding-bottom: 0 !important;
+            }
+        }
         
         @media (max-width: 768px) {
             .header {
@@ -1357,6 +1368,21 @@
                     <a href="{{ route('company.payables.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.payables.*') ? 'active' : '' }}" data-title="Contas a Pagar">
                         <i class="fas fa-arrow-circle-up"></i>
                         <span>Contas a Pagar</span>
+                    </a>
+                </div>
+                <div class="menu-section">
+                    <div class="menu-section-title">Contabilidade</div>
+                    <a href="{{ route('company.accounting.fiscal-entry-notes.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.accounting.fiscal-entry-notes.*') && !request()->routeIs('company.accounting.fiscal-entry-notes.report') ? 'active' : '' }}" data-title="NF entrada">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>Notas fiscais de entrada</span>
+                    </a>
+                    <a href="{{ route('company.accounting.fiscal-exit-notes.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.accounting.fiscal-exit-notes.*') ? 'active' : '' }}" data-title="NF saída">
+                        <i class="fas fa-file-export"></i>
+                        <span>Notas fiscais de saída</span>
+                    </a>
+                    <a href="{{ route('company.accounting.report') }}" class="sidebar-menu-item {{ request()->routeIs('company.accounting.report') || request()->routeIs('company.accounting.fiscal-entry-notes.report') ? 'active' : '' }}" data-title="Relatório fiscal">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Relatório fiscal</span>
                     </a>
                 </div>
             @endif

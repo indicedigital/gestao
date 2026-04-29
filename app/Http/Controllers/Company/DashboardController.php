@@ -123,7 +123,8 @@ class DashboardController extends Controller
         // ========== 2. PROJEÇÕES (PRÓXIMOS 3 MESES) ==========
         $projections = [];
         for ($i = 1; $i <= 3; $i++) {
-            $month = $selectedMonth->copy()->addMonths($i);
+            // Sempre partir do dia 1: addMonths a partir de 29–31 pode “pular” fevereiro ou duplicar março.
+            $month = $selectedMonth->copy()->startOfMonth()->addMonths($i);
             $monthStart = $month->copy()->startOfMonth();
             $monthEnd = $month->copy()->endOfMonth();
             
@@ -468,40 +469,41 @@ class DashboardController extends Controller
             ->select('id', 'description', 'value')
             ->get();
         
-        if ($payablesFromExpenses->isEmpty()) {
-            $expensesByCategoryChart = collect();
-        } else {
-            // Busca TODAS as expenses de uma vez (evita N+1)
+        // Acumula por nome de categoria (array associativo: alterar cópia retornada por
+        // firstWhere() em arrays dentro da Collection não persiste — somava só o 1º lançamento.)
+        $byCategoryLabel = [];
+
+        if ($payablesFromExpenses->isNotEmpty()) {
             $descriptions = $payablesFromExpenses->pluck('description')->unique()->toArray();
             $expenses = Expense::where('company_id', $company->id)
                 ->whereIn('description', $descriptions)
                 ->with('category:id,name,color')
                 ->get()
                 ->keyBy('description');
-            
-            // Agrupa por categoria
-            $expensesByCategoryChart = collect();
+
             foreach ($payablesFromExpenses as $payable) {
                 $expense = $expenses->get($payable->description);
-                
-                if ($expense && $expense->category) {
-                    $categoryName = $expense->category->name;
-                    $categoryColor = $expense->category->color ?? '#5e72e4';
-                    
-                    $existing = $expensesByCategoryChart->firstWhere('label', $categoryName);
-                    
-                    if ($existing) {
-                        $existing['value'] += (float) $payable->value;
-                    } else {
-                        $expensesByCategoryChart->push([
-                            'label' => $categoryName,
-                            'value' => (float) $payable->value,
-                            'color' => $categoryColor,
-                        ]);
-                    }
+
+                if (!$expense || !$expense->category) {
+                    continue;
                 }
+
+                $categoryName = $expense->category->name;
+                $amount = (float) $payable->value;
+
+                if (! isset($byCategoryLabel[$categoryName])) {
+                    $byCategoryLabel[$categoryName] = [
+                        'label' => $categoryName,
+                        'value' => 0.0,
+                        'color' => $expense->category->color ?? '#5e72e4',
+                    ];
+                }
+
+                $byCategoryLabel[$categoryName]['value'] += $amount;
             }
         }
+
+        $expensesByCategoryChart = collect(array_values($byCategoryLabel));
         
         // Adiciona a folha salarial ao gráfico
         if ($payrollValue > 0) {
@@ -540,7 +542,8 @@ class DashboardController extends Controller
         $history = [];
         
         for ($i = $months - 1; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
+            // Ancorar no 1º dia do mês antes de subMonths (ex.: 30/mar − 1 mês não pode virar “fevereiro inválido” e cair em março).
+            $date = now()->copy()->startOfMonth()->subMonths($i);
             $monthStart = $date->copy()->startOfMonth();
             $monthEnd = $date->copy()->endOfMonth();
             $monthName = $date->format('M/Y');

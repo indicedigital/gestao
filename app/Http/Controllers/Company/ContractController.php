@@ -85,6 +85,8 @@ class ContractController extends Controller
             'equal_installments' => 'nullable|boolean',
             'first_installment_date' => 'nullable|date',
             'billing_period' => 'nullable|in:monthly,yearly',
+            'recurring_due_date_type' => 'nullable|in:last_business_day,first_business_day,fifth_business_day,fixed_day',
+            'recurring_due_date_day' => 'nullable|integer|min:1|max:31',
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'auto_renew' => 'nullable|boolean',
@@ -122,13 +124,14 @@ class ContractController extends Controller
             }
         }
         
-        // Se for contrato recorrente, define valores padrão para data de vencimento
-        if ($validated['type'] === 'client_recurring' && $validated['billing_period'] === 'monthly') {
-            if (!isset($validated['recurring_due_date_type'])) {
-                $validated['recurring_due_date_type'] = 'fixed_day';
-            }
-            if ($validated['recurring_due_date_type'] === 'fixed_day' && !isset($validated['recurring_due_date_day'])) {
-                $validated['recurring_due_date_day'] = 5; // Padrão: dia 5
+        // Se for contrato recorrente mensal, define e normaliza data de vencimento
+        if ($validated['type'] === 'client_recurring' && ($validated['billing_period'] ?? null) === 'monthly') {
+            $validated['recurring_due_date_type'] = $validated['recurring_due_date_type'] ?? 'fixed_day';
+            if ($validated['recurring_due_date_type'] === 'fixed_day') {
+                $day = isset($validated['recurring_due_date_day']) ? (int) $validated['recurring_due_date_day'] : 5;
+                $validated['recurring_due_date_day'] = max(1, min(31, $day ?: 5));
+            } else {
+                $validated['recurring_due_date_day'] = null;
             }
         }
 
@@ -239,7 +242,7 @@ class ContractController extends Controller
             'first_installment_date' => 'nullable|date',
             'billing_period' => 'nullable|in:monthly,yearly',
             'recurring_due_date_type' => 'nullable|in:last_business_day,first_business_day,fifth_business_day,fixed_day',
-            'recurring_due_date_day' => 'nullable|integer|min:1|max:31|required_if:recurring_due_date_type,fixed_day',
+            'recurring_due_date_day' => 'nullable|integer|min:1|max:31',
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'auto_renew' => 'nullable|boolean',
@@ -247,13 +250,26 @@ class ContractController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        // Normaliza dia do mês quando o contrato (após edição) for recorrente mensal
+        if (($validated['type'] ?? $contract->type) === 'client_recurring' && ($validated['billing_period'] ?? $contract->billing_period) === 'monthly') {
+            $type = $validated['recurring_due_date_type'] ?? $contract->recurring_due_date_type ?? 'fixed_day';
+            $validated['recurring_due_date_type'] = $type;
+            if ($type === 'fixed_day') {
+                $day = isset($validated['recurring_due_date_day']) ? (int) $validated['recurring_due_date_day'] : (int) ($contract->recurring_due_date_day ?? 5);
+                $validated['recurring_due_date_day'] = max(1, min(31, $day ?: 5));
+            } else {
+                $validated['recurring_due_date_day'] = null;
+            }
+        }
+
         $contract->update($validated);
         
         // Regenera contas a receber se for contrato recorrente
         if ($contract->type === 'client_recurring' && $contract->billing_period === 'monthly') {
             $recurringService = new RecurringContractService();
-            $recurringService->generateReceivablesForMonth($contract, now()->startOfMonth());
-            $recurringService->generateReceivablesForMonth($contract, now()->addMonth()->startOfMonth());
+            $monthStart = now()->copy()->startOfMonth();
+            $recurringService->generateReceivablesForMonth($contract, $monthStart);
+            $recurringService->generateReceivablesForMonth($contract, $monthStart->copy()->addMonth());
         }
 
         // Regenera parcelas se for contrato fixo e configuração mudou
@@ -265,8 +281,9 @@ class ContractController extends Controller
         // Regenera contas a receber se for contrato recorrente e configuração mudou
         if ($contract->type === 'client_recurring' && $contract->billing_period === 'monthly') {
             $recurringService = new RecurringContractService();
-            $recurringService->generateReceivablesForMonth($contract, now()->startOfMonth());
-            $recurringService->generateReceivablesForMonth($contract, now()->addMonth()->startOfMonth());
+            $monthStart = now()->copy()->startOfMonth();
+            $recurringService->generateReceivablesForMonth($contract, $monthStart);
+            $recurringService->generateReceivablesForMonth($contract, $monthStart->copy()->addMonth());
         }
 
         return redirect()->route('company.contracts.index')

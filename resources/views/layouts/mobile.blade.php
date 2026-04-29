@@ -634,6 +634,16 @@
                 display: none !important;
             }
         }
+
+        @media print {
+            .bottom-nav {
+                display: none !important;
+                visibility: hidden !important;
+            }
+            body {
+                padding-bottom: 0 !important;
+            }
+        }
     </style>
     
     @stack('styles')
