@@ -22,6 +22,8 @@ use App\Http\Controllers\Company\SupplierController;
 use App\Http\Controllers\Company\FiscalEntryNoteController;
 use App\Http\Controllers\Company\FiscalExitNoteController;
 use App\Http\Controllers\Company\AccountingReportController;
+use App\Http\Controllers\Company\AiAssistantController;
+use App\Http\Controllers\Company\LeadController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
@@ -92,6 +94,9 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/update-cash', [DashboardController::class, 'updateCash'])->name('dashboard.update-cash');
+    Route::get('/dashboard/cash-report-data', [DashboardController::class, 'cashReportData'])->name('dashboard.cash-report-data');
+    Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai-assistant.chat');
     
     // Clientes
     Route::get('clients/export/excel', [ClientController::class, 'exportExcel'])->name('clients.export.excel');
@@ -100,6 +105,9 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
     
     // Projetos
     Route::resource('projects', ProjectController::class);
+
+    // Leads
+    Route::resource('leads', LeadController::class)->except(['show']);
     
     // Contratos
     Route::resource('contracts', ContractController::class);
@@ -133,6 +141,7 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
                Route::post('fiscal-entry-notes/{fiscal_entry_note}/toggle-issued', [FiscalEntryNoteController::class, 'toggleIssued'])->name('fiscal-entry-notes.toggle-issued');
                Route::resource('fiscal-entry-notes', FiscalEntryNoteController::class)->except(['show']);
                Route::post('fiscal-exit-notes/sync-from-receivables', [FiscalExitNoteController::class, 'syncFromReceivables'])->name('fiscal-exit-notes.sync-from-receivables');
+               Route::post('fiscal-exit-notes/{fiscal_exit_note}/mark-issued', [FiscalExitNoteController::class, 'markIssued'])->name('fiscal-exit-notes.mark-issued');
                Route::post('fiscal-exit-notes/{fiscal_exit_note}/toggle-issued', [FiscalExitNoteController::class, 'toggleIssued'])->name('fiscal-exit-notes.toggle-issued');
                Route::resource('fiscal-exit-notes', FiscalExitNoteController::class)->only(['index', 'edit', 'update', 'destroy']);
            });

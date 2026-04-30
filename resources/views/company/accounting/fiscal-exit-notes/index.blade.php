@@ -16,6 +16,12 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
         </div>
     @endif
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ $errors->first() }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        </div>
+    @endif
 
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
         <div>
@@ -112,8 +118,8 @@
                             <th>Cliente (tomador)</th>
                             <th>Tipo</th>
                             <th class="text-end">Valor</th>
-                            <th>NF</th>
-                            <th class="text-end">Ações</th>
+                            <th class="text-center">NF</th>
+                            <th class="text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -134,7 +140,7 @@
                                 </td>
                                 <td>{{ $n->person_type === 'pj' ? 'PJ' : 'PF' }}</td>
                                 <td class="text-end">R$ {{ number_format($n->amount_received, 2, ',', '.') }}</td>
-                                <td>
+                                <td class="text-center">
                                     @if($n->is_issued)
                                         <span class="badge bg-success">Emitida</span>
                                         @if($n->issued_at)
@@ -144,13 +150,32 @@
                                         <span class="badge bg-warning text-dark">Pendente</span>
                                     @endif
                                 </td>
-                                <td class="text-end text-nowrap">
-                                    <form action="{{ route('company.accounting.fiscal-exit-notes.toggle-issued', $n) }}" method="post" class="d-inline">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Alternar emitida / pendente">
-                                            <i class="fas fa-exchange-alt"></i>
+                                <td class="text-center text-nowrap">
+                                    @if(!$n->is_issued)
+                                        <button type="button"
+                                                class="btn btn-sm btn-success"
+                                                title="Marcar como emitida"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#markIssuedModal"
+                                                data-action="{{ route('company.accounting.fiscal-exit-notes.mark-issued', $n) }}"
+                                                data-client="{{ $n->client_name }}"
+                                                data-payment="{{ $n->receivable_payment_id }}"
+                                                data-issued-at="{{ now()->format('Y-m-d') }}">
+                                            <i class="fas fa-check-circle me-1"></i>Marcar como emitida
                                         </button>
-                                    </form>
+                                    @else
+                                        @if($n->documentFileUrl())
+                                            <a href="{{ $n->documentFileUrl() }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info" title="Abrir NF">
+                                                <i class="fas fa-file-download me-1"></i>Abrir NF
+                                            </a>
+                                        @endif
+                                        <form action="{{ route('company.accounting.fiscal-exit-notes.toggle-issued', $n) }}" method="post" class="d-inline" onsubmit="return confirm('Retornar esta nota para pendente?');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Retornar para pendente">
+                                                <i class="fas fa-undo-alt me-1"></i>Retornar pendente
+                                            </button>
+                                        </form>
+                                    @endif
                                     <a href="{{ route('company.accounting.fiscal-exit-notes.edit', $n) }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
                                     <form action="{{ route('company.accounting.fiscal-exit-notes.destroy', $n) }}" method="post" class="d-inline" onsubmit="return confirm('Remover este lançamento de NF? O recebimento em contas a receber não será alterado.');">
                                         @csrf
@@ -170,4 +195,65 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="markIssuedModal" tabindex="-1" aria-labelledby="markIssuedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="markIssuedForm" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="markIssuedModalLabel">Marcar como emitida</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3 text-muted small" id="markIssuedInfo"></p>
+                    <div class="mb-3">
+                        <label for="modal_issued_at" class="form-label">Data da emissão</label>
+                        <input type="date" class="form-control" id="modal_issued_at" name="issued_at" value="{{ now()->format('Y-m-d') }}">
+                    </div>
+                    <div class="mb-1">
+                        <label for="modal_note_file" class="form-label">Arquivo da NF (XML ou PDF) <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" id="modal_note_file" name="note_file" accept=".xml,.pdf,application/xml,text/xml,application/pdf" required>
+                        <div class="form-text">Tamanho máximo: 10 MB.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check-circle me-1"></i>Confirmar emissão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('markIssuedModal');
+    const form = document.getElementById('markIssuedForm');
+    const info = document.getElementById('markIssuedInfo');
+    const issuedAt = document.getElementById('modal_issued_at');
+    const noteFile = document.getElementById('modal_note_file');
+
+    if (!modal || !form) return;
+
+    modal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        if (!button) return;
+
+        const action = button.getAttribute('data-action');
+        const client = button.getAttribute('data-client') || 'Cliente';
+        const paymentId = button.getAttribute('data-payment') || '-';
+        const defaultDate = button.getAttribute('data-issued-at') || '';
+
+        form.setAttribute('action', action || '#');
+        info.textContent = 'Recebimento #' + paymentId + ' - ' + client + '.';
+        issuedAt.value = defaultDate;
+        noteFile.value = '';
+    });
+});
+</script>
+@endpush

@@ -162,6 +162,25 @@
 </div>
 
 <div class="mb-3">
+    <label for="note_file" class="form-label">Arquivo da nota fiscal (XML ou PDF)</label>
+    <input type="file" class="form-control @error('note_file') is-invalid @enderror" id="note_file" name="note_file" accept=".xml,.pdf,application/xml,text/xml,application/pdf">
+    <div class="form-text">
+        Obrigatório para marcar como emitida. Tamanho máximo: 10 MB.
+    </div>
+    @if(!empty($note?->document_file_path))
+        <div class="mt-2">
+            <a href="{{ $note->documentFileUrl() }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-file-alt me-1"></i>Abrir arquivo atual
+            </a>
+            <small class="text-muted ms-2">{{ $note->document_file_original_name }}</small>
+        </div>
+    @endif
+    @error('note_file')
+    <div class="invalid-feedback d-block">{{ $message }}</div>
+    @enderror
+</div>
+
+<div class="mb-3">
     <label for="internal_notes" class="form-label">Observações internas</label>
     <textarea class="form-control @error('internal_notes') is-invalid @enderror" id="internal_notes" name="internal_notes" rows="2">{{ old('internal_notes', $note->internal_notes ?? '') }}</textarea>
     @error('internal_notes')

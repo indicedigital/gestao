@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 
 class FiscalExitNote extends Model
 {
@@ -30,6 +31,9 @@ class FiscalExitNote extends Model
         'payment_method',
         'is_issued',
         'issued_at',
+        'document_file_path',
+        'document_file_original_name',
+        'document_file_mime',
         'internal_notes',
     ];
 
@@ -73,6 +77,15 @@ class FiscalExitNote extends Model
     public function scopeReceivedInMonth($query, int $year, int $month)
     {
         return $query->whereYear('received_date', $year)->whereMonth('received_date', $month);
+    }
+
+    public function documentFileUrl(): ?string
+    {
+        if (! $this->document_file_path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->document_file_path);
     }
 
     /**

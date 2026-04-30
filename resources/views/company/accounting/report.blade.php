@@ -370,7 +370,7 @@
         @endif
 
         <footer class="fiscal-report-footer">
-            Relatório interno para apoio à emissão fiscal — {{ config('app.name') }}
+            Relatório interno para apoio à emissão fiscal — ÍNDICE DIGITAL
         </footer>
     </div>
 </div>

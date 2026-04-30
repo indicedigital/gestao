@@ -16,7 +16,7 @@
 
     <div class="card shadow">
         <div class="card-body">
-            <form action="{{ route('company.accounting.fiscal-exit-notes.update', $note) }}" method="POST">
+            <form action="{{ route('company.accounting.fiscal-exit-notes.update', $note) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
                 @include('company.accounting.fiscal-exit-notes._form', ['note' => $note])

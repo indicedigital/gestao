@@ -13,6 +13,7 @@ use App\Models\Project;
 use App\Models\Receivable;
 use App\Models\ReceivablePayment;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -266,6 +267,13 @@ class DashboardController extends Controller
         $totalContracts = Contract::where('company_id', $company->id)
             ->where('status', 'active')
             ->count();
+
+        $mrrContractsQuery = Contract::where('company_id', $company->id)
+            ->where('status', 'active')
+            ->where('type', 'client_recurring')
+            ->where('billing_period', 'monthly');
+        $mrrActiveContractsCount = (clone $mrrContractsQuery)->count();
+        $mrrValue = (float) (clone $mrrContractsQuery)->sum('value');
         
         $contractsExpiring30 = Contract::where('company_id', $company->id)
             ->where('status', 'active')
@@ -312,19 +320,66 @@ class DashboardController extends Controller
         
         // ========== 5. KPIS EXTRAS ==========
         
-        // Burn rate (despesa mensal média)
-        $burnRate = $expensesRealized;
+        // Fluxo líquido mensal (entradas - saídas)
+        $cashInflows = (float) $revenueRealized;
+        $cashOutflows = (float) $expensesRealized;
+        $netCashFlow = $cashInflows - $cashOutflows;
+
+        // Burn Rate (queima mensal quando saídas > entradas)
+        $burnRate = max(0, $cashOutflows - $cashInflows);
+
+        // Caixa disponível editável (fallback para cálculo antigo se ainda não configurado)
+        $calculatedCashFallback = $cashInflows - $cashOutflows;
+        $availableCash = $company->current_cash_balance !== null
+            ? (float) $company->current_cash_balance
+            : $calculatedCashFallback;
         
-        // Caixa disponível (receitas - despesas do mês)
-        $availableCash = $revenueRealized - $expensesRealized;
-        
-        // Meses de fôlego financeiro (simplificado - usando caixa atual / despesa mensal)
+        // Runway (fôlego de caixa)
         $monthsOfRunway = $burnRate > 0 ? ($availableCash / $burnRate) : 0;
         
         // ========== 6. GRÁFICOS ==========
         
         // Histórico financeiro (últimos 6 meses + próximos 3 meses)
-        $financialHistory = $this->getFinancialHistory($company, 6);
+        $financialHistory = $this->getFinancialHistory($company, $selectedMonth, 6);
+        $financialHistoryRealized = $financialHistory;
+
+        $avgInflows = (float) collect($financialHistoryRealized)->avg('revenue');
+        $avgOutflows = (float) collect($financialHistoryRealized)->avg('expenses');
+        $dailyResult = (float) ($selectedMonth->daysInMonth > 0 ? ($netCashFlow / $selectedMonth->daysInMonth) : 0);
+        $weeklyResult = (float) ($netCashFlow / 4.345);
+        $monthlyResult = (float) $netCashFlow;
+
+        // Obrigações de curto prazo: pendências para os próximos 30 dias
+        $shortTermObligations = (float) Payable::where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(30)->endOfDay()])
+            ->sum('value');
+
+        $liquidityIndex = $shortTermObligations > 0 ? ($availableCash / $shortTermObligations) : null;
+        $cashCommitmentPercent = $availableCash > 0 ? (($shortTermObligations / $availableCash) * 100) : null;
+
+        // Evolução de caixa (reconstruída em retrocesso a partir do caixa atual e dos fluxos mensais)
+        $cashEvolution = [];
+        if (count($financialHistoryRealized) > 0) {
+            $balances = array_fill(0, count($financialHistoryRealized), 0.0);
+            $lastIdx = count($financialHistoryRealized) - 1;
+            $balances[$lastIdx] = (float) $availableCash;
+
+            for ($i = $lastIdx - 1; $i >= 0; $i--) {
+                $nextMonthNet = (float) $financialHistoryRealized[$i + 1]['profit'];
+                $balances[$i] = $balances[$i + 1] - $nextMonthNet;
+            }
+
+            foreach ($financialHistoryRealized as $idx => $item) {
+                $cashEvolution[] = [
+                    'month' => $item['month'],
+                    'balance' => round((float) $balances[$idx], 2),
+                    'inflows' => round((float) $item['revenue'], 2),
+                    'outflows' => round((float) $item['expenses'], 2),
+                    'net' => round((float) $item['profit'], 2),
+                ];
+            }
+        }
         
         // Adiciona projeções ao histórico
         foreach ($projections as $proj) {
@@ -391,6 +446,8 @@ class DashboardController extends Controller
             'activeClients',
             'overdueClients',
             'totalContracts',
+            'mrrActiveContractsCount',
+            'mrrValue',
             'contractsExpiring30',
             'contractsExpiring60',
             'contractsExpiring90',
@@ -404,10 +461,229 @@ class DashboardController extends Controller
             'burnRate',
             'availableCash',
             'monthsOfRunway',
+            'cashInflows',
+            'cashOutflows',
+            'netCashFlow',
+            'avgInflows',
+            'avgOutflows',
+            'dailyResult',
+            'weeklyResult',
+            'monthlyResult',
+            'shortTermObligations',
+            'liquidityIndex',
+            'cashCommitmentPercent',
+            'cashEvolution',
             'financialHistory',
             'contractsExpiringList',
             'expensesByCategoryChart'
         ));
+    }
+
+    public function updateCash(Request $request)
+    {
+        $company = $this->getCurrentCompany();
+
+        $validated = $request->validate([
+            'current_cash_balance' => ['required', 'numeric', 'min:0'],
+            'month' => ['nullable', 'regex:/^\d{4}-\d{2}$/'],
+        ]);
+
+        $company->current_cash_balance = (float) $validated['current_cash_balance'];
+        $company->save();
+
+        $query = [];
+        if (! empty($validated['month'])) {
+            $query['month'] = $validated['month'];
+        }
+
+        return redirect()
+            ->route('company.dashboard', $query)
+            ->with('success', 'Caixa atualizado com sucesso.');
+    }
+
+    public function cashReportData(Request $request): JsonResponse
+    {
+        $company = $this->getCurrentCompany();
+
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $endDate = ! empty($validated['end_date'])
+            ? Carbon::parse($validated['end_date'])->endOfDay()
+            : now()->endOfDay();
+        $startDate = ! empty($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])->startOfDay()
+            : $endDate->copy()->subDays(89)->startOfDay();
+
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+        }
+
+        $currentCash = (float) ($company->current_cash_balance ?? 0);
+        $dailyRows = $this->aggregateDailyCashFlow($company->id, $startDate, $endDate);
+
+        // Ajuste do caixa final para períodos no passado (aproxima histórico a partir do saldo atual)
+        $endingCashAtEndDate = $currentCash;
+        if ($endDate->lt(now()->startOfDay())) {
+            $afterRows = $this->aggregateDailyCashFlow($company->id, $endDate->copy()->addDay()->startOfDay(), now()->endOfDay());
+            $netAfterEnd = collect($afterRows)->sum(fn ($r) => (float) $r['net']);
+            $endingCashAtEndDate = $currentCash - $netAfterEnd;
+        }
+
+        $totalNet = collect($dailyRows)->sum(fn ($r) => (float) $r['net']);
+        $startingCash = $endingCashAtEndDate - $totalNet;
+
+        $evolution = [];
+        $running = $startingCash;
+        foreach ($dailyRows as $row) {
+            $running += (float) $row['net'];
+            $evolution[] = [
+                'date' => $row['date'],
+                'label' => Carbon::parse($row['date'])->format('d/m'),
+                'inflows' => round((float) $row['inflows'], 2),
+                'outflows' => round((float) $row['outflows'], 2),
+                'net' => round((float) $row['net'], 2),
+                'balance' => round((float) $running, 2),
+            ];
+        }
+
+        $totalInflows = (float) collect($dailyRows)->sum(fn ($r) => (float) $r['inflows']);
+        $totalOutflows = (float) collect($dailyRows)->sum(fn ($r) => (float) $r['outflows']);
+        $netCashFlow = $totalInflows - $totalOutflows;
+        $burnRate = max(0, $totalOutflows - $totalInflows);
+        $periodDays = max(1, $startDate->diffInDays($endDate) + 1);
+        $avgInflows = $totalInflows / $periodDays;
+        $avgOutflows = $totalOutflows / $periodDays;
+
+        $dailyResult = $netCashFlow / $periodDays;
+        $weeklyResult = $dailyResult * 7;
+        $monthlyResult = $dailyResult * 30;
+
+        $shortTermObligations = (float) Payable::where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(30)->endOfDay()])
+            ->sum('value');
+
+        $liquidityIndex = $shortTermObligations > 0 ? ($currentCash / $shortTermObligations) : null;
+        $cashCommitmentPercent = $currentCash > 0 ? (($shortTermObligations / $currentCash) * 100) : null;
+        $runwayMonths = $burnRate > 0 ? ($currentCash / $burnRate) : null;
+
+        // Previsões de caixa (15, 30 e 60 dias)
+        $forecastStart = now()->addDay()->startOfDay();
+        $forecastByDays = [];
+        $forecastEvolution15 = [];
+        foreach ([15, 30, 60] as $days) {
+            $forecastEnd = now()->addDays($days)->endOfDay();
+            $forecastRows = $this->aggregateForecastDailyFlow($company->id, $forecastStart, $forecastEnd);
+
+            $runningBalance = $currentCash;
+            $timeline = [];
+            foreach ($forecastRows as $row) {
+                $runningBalance += (float) $row['net'];
+                $timeline[] = [
+                    'date' => $row['date'],
+                    'label' => Carbon::parse($row['date'])->format('d/m'),
+                    'inflows' => round((float) $row['inflows'], 2),
+                    'outflows' => round((float) $row['outflows'], 2),
+                    'net' => round((float) $row['net'], 2),
+                    'balance' => round((float) $runningBalance, 2),
+                ];
+            }
+
+            if ($days === 15) {
+                $forecastEvolution15 = $timeline;
+            }
+
+            $projectedInflows = (float) collect($forecastRows)->sum(fn ($r) => (float) $r['inflows']);
+            $projectedOutflows = (float) collect($forecastRows)->sum(fn ($r) => (float) $r['outflows']);
+            $projectedNet = $projectedInflows - $projectedOutflows;
+            $projectedEndCash = $currentCash + $projectedNet;
+
+            $growthTargets = [];
+            foreach ([0, 10, 20, 30] as $pct) {
+                $targetCash = $pct === 0 ? 0.01 : ($currentCash * (1 + ($pct / 100)));
+                $growthTargets[] = [
+                    'growth_percent' => $pct,
+                    'target_cash' => round($targetCash, 2),
+                    'needed_inflow' => round(max(0, $targetCash - $projectedEndCash), 2),
+                ];
+            }
+
+            $forecastByDays[] = [
+                'horizon_days' => $days,
+                'start_cash' => round($currentCash, 2),
+                'projected_inflows' => round($projectedInflows, 2),
+                'projected_outflows' => round($projectedOutflows, 2),
+                'projected_net' => round($projectedNet, 2),
+                'projected_end_cash' => round($projectedEndCash, 2),
+                'growth_targets' => $growthTargets,
+                'timeline' => $timeline,
+            ];
+        }
+
+        // Projeção do próximo mês calendário
+        $nextMonthStart = now()->copy()->addMonthNoOverflow()->startOfMonth();
+        $nextMonthEnd = $nextMonthStart->copy()->endOfMonth();
+        $nextMonthIn = (float) Receivable::where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->whereBetween('due_date', [$nextMonthStart, $nextMonthEnd])
+            ->sum('value');
+        $nextMonthOut = (float) Payable::where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->whereBetween('due_date', [$nextMonthStart, $nextMonthEnd])
+            ->sum('value');
+        $nextMonthNet = $nextMonthIn - $nextMonthOut;
+        $projectedEndNextMonth = $currentCash + $nextMonthNet;
+
+        $nextMonthGrowthTargets = [];
+        foreach ([0, 10, 20, 30] as $pct) {
+            $targetCash = $pct === 0 ? 0.01 : ($currentCash * (1 + ($pct / 100)));
+            $nextMonthGrowthTargets[] = [
+                'growth_percent' => $pct,
+                'target_cash' => round($targetCash, 2),
+                'needed_inflow' => round(max(0, $targetCash - $projectedEndNextMonth), 2),
+            ];
+        }
+
+        return response()->json([
+            'period' => [
+                'start_date' => $startDate->toDateString(),
+                'end_date' => $endDate->toDateString(),
+                'days' => $periodDays,
+            ],
+            'summary' => [
+                'current_cash' => round($currentCash, 2),
+                'starting_cash' => round($startingCash, 2),
+                'ending_cash' => round($endingCashAtEndDate, 2),
+                'inflows' => round($totalInflows, 2),
+                'outflows' => round($totalOutflows, 2),
+                'net_cash_flow' => round($netCashFlow, 2),
+                'burn_rate' => round($burnRate, 2),
+                'runway_months' => $runwayMonths !== null ? round($runwayMonths, 2) : null,
+                'avg_inflows' => round($avgInflows, 2),
+                'avg_outflows' => round($avgOutflows, 2),
+                'daily_result' => round($dailyResult, 2),
+                'weekly_result' => round($weeklyResult, 2),
+                'monthly_result' => round($monthlyResult, 2),
+                'short_term_obligations' => round($shortTermObligations, 2),
+                'liquidity_index' => $liquidityIndex !== null ? round($liquidityIndex, 2) : null,
+                'cash_commitment_percent' => $cashCommitmentPercent !== null ? round($cashCommitmentPercent, 2) : null,
+            ],
+            'evolution' => $evolution,
+            'forecast_15_days' => $forecastEvolution15,
+            'forecast_horizons' => $forecastByDays,
+            'next_month_projection' => [
+                'month_label' => $nextMonthStart->locale('pt_BR')->translatedFormat('F/Y'),
+                'current_cash' => round($currentCash, 2),
+                'projected_inflows' => round($nextMonthIn, 2),
+                'projected_outflows' => round($nextMonthOut, 2),
+                'projected_net' => round($nextMonthNet, 2),
+                'projected_end_cash' => round($projectedEndNextMonth, 2),
+                'target_growth' => $nextMonthGrowthTargets,
+            ],
+        ]);
     }
 
     /**
@@ -537,13 +813,12 @@ class DashboardController extends Controller
             ->sum('amount');
     }
 
-    protected function getFinancialHistory(Company $company, int $months = 6): array
+    protected function getFinancialHistory(Company $company, Carbon $referenceMonth, int $months = 6): array
     {
         $history = [];
         
         for ($i = $months - 1; $i >= 0; $i--) {
-            // Ancorar no 1º dia do mês antes de subMonths (ex.: 30/mar − 1 mês não pode virar “fevereiro inválido” e cair em março).
-            $date = now()->copy()->startOfMonth()->subMonths($i);
+            $date = $referenceMonth->copy()->startOfMonth()->subMonths($i);
             $monthStart = $date->copy()->startOfMonth();
             $monthEnd = $date->copy()->endOfMonth();
             $monthName = $date->format('M/Y');
@@ -565,6 +840,83 @@ class DashboardController extends Controller
         }
         
         return $history;
+    }
+
+    /**
+     * @return array<int, array{date:string,inflows:float,outflows:float,net:float}>
+     */
+    protected function aggregateDailyCashFlow(int $companyId, Carbon $startDate, Carbon $endDate): array
+    {
+        $revenues = ReceivablePayment::whereHas('receivable', function ($q) use ($companyId) {
+            $q->where('company_id', $companyId);
+        })
+            ->whereBetween('paid_date', [$startDate, $endDate])
+            ->selectRaw('DATE(paid_date) as d, SUM(amount) as total')
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        $expenses = Payable::where('company_id', $companyId)
+            ->where('status', 'paid')
+            ->whereBetween('paid_date', [$startDate, $endDate])
+            ->selectRaw('DATE(paid_date) as d, SUM(value) as total')
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        $rows = [];
+        $cursor = $startDate->copy()->startOfDay();
+        $end = $endDate->copy()->startOfDay();
+        while ($cursor->lte($end)) {
+            $d = $cursor->toDateString();
+            $in = (float) ($revenues[$d] ?? 0);
+            $out = (float) ($expenses[$d] ?? 0);
+            $rows[] = [
+                'date' => $d,
+                'inflows' => $in,
+                'outflows' => $out,
+                'net' => $in - $out,
+            ];
+            $cursor->addDay();
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array<int, array{date:string,inflows:float,outflows:float,net:float}>
+     */
+    protected function aggregateForecastDailyFlow(int $companyId, Carbon $startDate, Carbon $endDate): array
+    {
+        $inflows = Receivable::where('company_id', $companyId)
+            ->where('status', 'pending')
+            ->whereBetween('due_date', [$startDate, $endDate])
+            ->selectRaw('DATE(due_date) as d, SUM(value) as total')
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        $outflows = Payable::where('company_id', $companyId)
+            ->where('status', 'pending')
+            ->whereBetween('due_date', [$startDate, $endDate])
+            ->selectRaw('DATE(due_date) as d, SUM(value) as total')
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        $rows = [];
+        $cursor = $startDate->copy()->startOfDay();
+        $end = $endDate->copy()->startOfDay();
+        while ($cursor->lte($end)) {
+            $d = $cursor->toDateString();
+            $in = (float) ($inflows[$d] ?? 0);
+            $out = (float) ($outflows[$d] ?? 0);
+            $rows[] = [
+                'date' => $d,
+                'inflows' => $in,
+                'outflows' => $out,
+                'net' => $in - $out,
+            ];
+            $cursor->addDay();
+        }
+
+        return $rows;
     }
     
     /**

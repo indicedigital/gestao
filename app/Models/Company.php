@@ -13,6 +13,7 @@ class Company extends Model
         'email',
         'phone',
         'logo_path',
+        'current_cash_balance',
         'status',
         'owner_id',
     ];
@@ -102,6 +103,14 @@ class Company extends Model
     public function projects()
     {
         return $this->hasMany(Project::class);
+    }
+
+    /**
+     * Leads da empresa
+     */
+    public function leads()
+    {
+        return $this->hasMany(Lead::class);
     }
 
     /**

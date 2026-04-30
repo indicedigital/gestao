@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY', ''),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'http_verify' => env('GEMINI_HTTP_VERIFY', true),
+        'ca_bundle' => env('GEMINI_CA_BUNDLE'),
+    ],
+
 ];

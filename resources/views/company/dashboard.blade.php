@@ -27,6 +27,42 @@
     .kpi-card.warning { border-top: 4px solid #fb6340; }
     .kpi-card.info { border-top: 4px solid #11cdef; }
     .kpi-card.secondary { border-top: 4px solid #6c757d; }
+    .kpi-card.clickable { cursor: pointer; }
+    .cash-report-modal .modal-dialog {
+        max-width: 1650px;
+    }
+    .cash-indicators-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .cash-indicator-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: #f8fafc;
+        min-height: 74px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .cash-indicator-card .label {
+        font-size: 11px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+        margin-bottom: 3px;
+    }
+    .cash-indicator-card .value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a202c;
+        line-height: 1.2;
+    }
+    .cash-indicator-card.highlight {
+        background: linear-gradient(135deg, #eef2ff 0%, #e0f2fe 100%);
+        border-color: #c7d2fe;
+    }
     
     .kpi-card h6 {
         font-size: 12px;
@@ -183,6 +219,13 @@
 @endpush
 
 @section('content')
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        </div>
+    @endif
+
     <!-- Header -->
     <div class="page-header-modern mb-4">
         <div class="d-flex justify-content-between align-items-center flex-wrap">
@@ -299,7 +342,7 @@
 
         <!-- Card 4 - Caixa Atual -->
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="kpi-card info">
+            <div class="kpi-card info clickable" data-bs-toggle="modal" data-bs-target="#cashReportModal" title="Clique para ver relatório de caixa">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
                         <h6>Caixa Disponível</h6>
@@ -309,8 +352,16 @@
                         <i class="fas fa-wallet fa-lg text-info"></i>
                     </div>
                 </div>
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center justify-content-between">
                     <span class="text-muted small">Fôlego: {{ number_format($monthsOfRunway, 1) }} meses</span>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-info"
+                            data-bs-toggle="modal"
+                            data-bs-target="#updateCashModal"
+                            onclick="event.stopPropagation();"
+                            title="Atualizar valor do caixa">
+                        <i class="fas fa-edit me-1"></i>Editar
+                    </button>
                 </div>
             </div>
         </div>
@@ -362,23 +413,14 @@
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
                         <h6>MRR (Recorrente)</h6>
-                        <h3>
-                            @php
-                                $mrr = \App\Models\Contract::where('company_id', $company->id)
-                                    ->where('status', 'active')
-                                    ->where('type', 'client_recurring')
-                                    ->where('billing_period', 'monthly')
-                                    ->sum('value');
-                            @endphp
-                            R$ {{ number_format($mrr, 2, ',', '.') }}
-                        </h3>
+                        <h3>R$ {{ number_format($mrrValue, 2, ',', '.') }}</h3>
                     </div>
                     <div class="bg-success bg-opacity-10 rounded-circle p-3">
                         <i class="fas fa-sync-alt fa-lg text-success"></i>
                     </div>
                 </div>
                 <div class="d-flex align-items-center">
-                    <span class="text-muted small">{{ $totalContracts }} contratos ativos</span>
+                    <span class="text-muted small">{{ $mrrActiveContractsCount }} contratos recorrentes ativos</span>
                 </div>
             </div>
         </div>
@@ -813,6 +855,208 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="updateCashModal" tabindex="-1" aria-labelledby="updateCashModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="{{ route('company.dashboard.update-cash') }}" method="POST">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="updateCashModalLabel">Atualizar Caixa Disponível</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="month" value="{{ $monthFilter }}">
+                        <label for="current_cash_balance" class="form-label">Valor atual do caixa (R$)</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="current_cash_balance" name="current_cash_balance" value="{{ number_format($availableCash, 2, '.', '') }}" required>
+                        <div class="form-text">Use o saldo real da conta para manter o sistema sincronizado.</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar caixa</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade cash-report-modal" id="cashReportModal" tabindex="-1" aria-labelledby="cashReportModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cashReportModalLabel">Relatório de Caixa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label for="cash_report_start_date" class="form-label small text-muted">Data inicial</label>
+                            <input type="date" class="form-control form-control-sm" id="cash_report_start_date" value="{{ now()->subDays(89)->format('Y-m-d') }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="cash_report_end_date" class="form-label small text-muted">Data final</label>
+                            <input type="date" class="form-control form-control-sm" id="cash_report_end_date" value="{{ now()->format('Y-m-d') }}">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-primary btn-sm" id="cash_report_refresh_btn">
+                                <i class="fas fa-sync-alt me-1"></i>Atualizar relatório
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Fluxo de Caixa Líquido</div>
+                                <div class="fw-bold" id="cash_metric_net_cash_flow">R$ 0,00</div>
+                                <div class="small text-muted">Entradas - Saídas</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Burn Rate</div>
+                                <div class="fw-bold text-danger" id="cash_metric_burn_rate">R$ 0,00</div>
+                                <div class="small text-muted">Saídas - Entradas (quando negativo)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Runway</div>
+                                <div class="fw-bold text-info" id="cash_metric_runway">N/A</div>
+                                <div class="small text-muted">Caixa atual / Burn rate</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">% Comprometimento do Caixa</div>
+                                <div class="fw-bold text-warning" id="cash_metric_commitment">N/A</div>
+                                <div class="small text-muted">Obrigações curtas / Caixa</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <h6 class="mb-2">Evolução de Caixa</h6>
+                                <div style="height: 260px;">
+                                    <canvas id="cashEvolutionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <h6 class="mb-2">Entradas x Saídas (período)</h6>
+                                <div style="height: 260px;">
+                                    <canvas id="cashFlowBarChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-8">
+                            <div class="border rounded p-3">
+                                <h6 class="mb-2">Previsão de Caixa (próximos 15 dias)</h6>
+                                <div style="height: 240px;">
+                                    <canvas id="cashForecast15Chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <h6 class="mb-2">Indicadores</h6>
+                                <div class="cash-indicators-grid" id="cash_metrics_list">
+                                    <div class="cash-indicator-card highlight">
+                                        <div class="label">Entradas</div>
+                                        <div class="value text-success" data-cash-key="inflows">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card highlight">
+                                        <div class="label">Saídas</div>
+                                        <div class="value text-danger" data-cash-key="outflows">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Média entradas</div>
+                                        <div class="value" data-cash-key="avg_inflows">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Média saídas</div>
+                                        <div class="value" data-cash-key="avg_outflows">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Resultado diário</div>
+                                        <div class="value" data-cash-key="daily_result">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Resultado semanal</div>
+                                        <div class="value" data-cash-key="weekly_result">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Resultado mensal</div>
+                                        <div class="value" data-cash-key="monthly_result">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Obrigações curto prazo</div>
+                                        <div class="value" data-cash-key="short_term_obligations">R$ 0,00</div>
+                                    </div>
+                                    <div class="cash-indicator-card">
+                                        <div class="label">Liquidez de caixa</div>
+                                        <div class="value text-info" data-cash-key="liquidity_index">N/A</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border rounded p-3">
+                        <h6 class="mb-2">Projeções de Caixa e Entrada Necessária</h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Horizonte</th>
+                                        <th class="text-end">Caixa atual</th>
+                                        <th class="text-end">Entradas previstas</th>
+                                        <th class="text-end">Saídas previstas</th>
+                                        <th class="text-end">Caixa projetado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cash_projection_summary_tbody">
+                                    <tr><td colspan="5" class="text-center text-muted">Carregando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="table-responsive">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small text-muted">Metas por horizonte</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label for="cash_growth_horizon_filter" class="small text-muted mb-0">Filtrar:</label>
+                                    <select id="cash_growth_horizon_filter" class="form-select form-select-sm" style="width: 120px;">
+                                        <option value="15">15 dias</option>
+                                        <option value="30">30 dias</option>
+                                        <option value="60">60 dias</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Meta</th>
+                                        <th class="text-end">Caixa alvo</th>
+                                        <th class="text-end">Entrada adicional necessária</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cash_growth_targets_tbody">
+                                    <tr><td colspan="3" class="text-center text-muted">Carregando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -1012,6 +1256,212 @@
                 }
             });
         }
+    }
+
+    const cashReportModal = document.getElementById('cashReportModal');
+    const cashReportEndpoint = @json(route('company.dashboard.cash-report-data'));
+    const cashStartInput = document.getElementById('cash_report_start_date');
+    const cashEndInput = document.getElementById('cash_report_end_date');
+    const cashRefreshBtn = document.getElementById('cash_report_refresh_btn');
+    const cashGrowthHorizonFilter = document.getElementById('cash_growth_horizon_filter');
+
+    let cashEvolutionChart = null;
+    let cashFlowBarChart = null;
+    let cashForecast15Chart = null;
+    let cashReportDataCache = null;
+
+    const brl = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pct = (v) => v === null || v === undefined ? 'N/A' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+
+    function renderGrowthTargetsTable(data) {
+        const growthTbody = document.getElementById('cash_growth_targets_tbody');
+        if (!growthTbody) return;
+
+        const horizons = data.forecast_horizons || [];
+        const selectedHorizon = Number(cashGrowthHorizonFilter?.value || 15);
+        const selected = horizons.find(h => Number(h.horizon_days) === selectedHorizon);
+
+        if (!selected || !selected.growth_targets || !selected.growth_targets.length) {
+            growthTbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem projeções para o horizonte selecionado</td></tr>';
+            return;
+        }
+
+        growthTbody.innerHTML = selected.growth_targets.map(item => `
+            <tr>
+                <td>${item.growth_percent === 0 ? 'Ficar positivo' : 'Crescer ' + item.growth_percent + '%'}</td>
+                <td class="text-end">${brl(item.target_cash)}</td>
+                <td class="text-end fw-bold ${Number(item.needed_inflow) > 0 ? 'text-danger' : 'text-success'}">${brl(item.needed_inflow)}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadCashReport() {
+        if (!cashStartInput || !cashEndInput) return;
+        const params = new URLSearchParams({
+            start_date: cashStartInput.value,
+            end_date: cashEndInput.value
+        });
+
+        const res = await fetch(`${cashReportEndpoint}?${params.toString()}`, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        cashReportDataCache = data;
+        const summary = data.summary || {};
+        const evolution = data.evolution || [];
+        const forecast = data.forecast_15_days || [];
+        const horizons = data.forecast_horizons || [];
+
+        const netEl = document.getElementById('cash_metric_net_cash_flow');
+        if (netEl) {
+            netEl.textContent = brl(summary.net_cash_flow);
+            netEl.classList.toggle('text-success', Number(summary.net_cash_flow) >= 0);
+            netEl.classList.toggle('text-danger', Number(summary.net_cash_flow) < 0);
+        }
+        const burnEl = document.getElementById('cash_metric_burn_rate');
+        if (burnEl) burnEl.textContent = brl(summary.burn_rate);
+        const runwayEl = document.getElementById('cash_metric_runway');
+        if (runwayEl) runwayEl.textContent = summary.runway_months === null ? 'N/A' : Number(summary.runway_months).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' meses';
+        const commEl = document.getElementById('cash_metric_commitment');
+        if (commEl) commEl.textContent = pct(summary.cash_commitment_percent);
+
+        document.querySelectorAll('#cash_metrics_list [data-cash-key]').forEach((el) => {
+            const k = el.getAttribute('data-cash-key');
+            const val = summary[k];
+            if (k === 'liquidity_index') {
+                el.textContent = val === null || val === undefined ? 'N/A' : Number(val).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            } else {
+                el.textContent = brl(val);
+            }
+        });
+
+        const projectionSummaryTbody = document.getElementById('cash_projection_summary_tbody');
+        if (projectionSummaryTbody) {
+            const rows = horizons.map(h => `
+                <tr>
+                    <td>${h.horizon_days} dias</td>
+                    <td class="text-end">${brl(h.start_cash)}</td>
+                    <td class="text-end text-success">${brl(h.projected_inflows)}</td>
+                    <td class="text-end text-danger">${brl(h.projected_outflows)}</td>
+                    <td class="text-end fw-bold ${Number(h.projected_end_cash) >= Number(h.start_cash) ? 'text-success' : 'text-danger'}">${brl(h.projected_end_cash)}</td>
+                </tr>
+            `);
+            const nm = data.next_month_projection || null;
+            if (nm) {
+                rows.push(`
+                    <tr>
+                        <td>Próximo mês (${nm.month_label})</td>
+                        <td class="text-end">${brl(nm.current_cash)}</td>
+                        <td class="text-end text-success">${brl(nm.projected_inflows)}</td>
+                        <td class="text-end text-danger">${brl(nm.projected_outflows)}</td>
+                        <td class="text-end fw-bold ${Number(nm.projected_end_cash) >= Number(nm.current_cash) ? 'text-success' : 'text-danger'}">${brl(nm.projected_end_cash)}</td>
+                    </tr>
+                `);
+            }
+            projectionSummaryTbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="text-center text-muted">Sem projeções</td></tr>';
+        }
+
+        renderGrowthTargetsTable(data);
+
+        const evoCanvas = document.getElementById('cashEvolutionChart');
+        if (evoCanvas) {
+            if (cashEvolutionChart) cashEvolutionChart.destroy();
+            cashEvolutionChart = new Chart(evoCanvas, {
+                type: 'line',
+                data: {
+                    labels: evolution.map(i => i.label),
+                    datasets: [
+                        {
+                            label: 'Saldo de Caixa',
+                            data: evolution.map(i => i.balance),
+                            borderColor: 'rgba(17, 205, 239, 1)',
+                            backgroundColor: 'rgba(17, 205, 239, 0.15)',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Fluxo Líquido',
+                            data: evolution.map(i => i.net),
+                            borderColor: 'rgba(94, 114, 228, 1)',
+                            backgroundColor: 'rgba(94, 114, 228, 0.10)',
+                            fill: false,
+                            tension: 0.25
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        const barCanvas = document.getElementById('cashFlowBarChart');
+        if (barCanvas) {
+            if (cashFlowBarChart) cashFlowBarChart.destroy();
+            cashFlowBarChart = new Chart(barCanvas, {
+                type: 'bar',
+                data: {
+                    labels: evolution.map(i => i.label),
+                    datasets: [
+                        {
+                            label: 'Entradas',
+                            data: evolution.map(i => i.inflows),
+                            backgroundColor: 'rgba(46, 204, 113, 0.7)'
+                        },
+                        {
+                            label: 'Saídas',
+                            data: evolution.map(i => i.outflows),
+                            backgroundColor: 'rgba(245, 54, 92, 0.7)'
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        const fcCanvas = document.getElementById('cashForecast15Chart');
+        if (fcCanvas) {
+            if (cashForecast15Chart) cashForecast15Chart.destroy();
+            cashForecast15Chart = new Chart(fcCanvas, {
+                type: 'line',
+                data: {
+                    labels: forecast.map(i => i.label),
+                    datasets: [
+                        {
+                            label: 'Previsão Saldo',
+                            data: forecast.map(i => i.balance),
+                            borderColor: 'rgba(251, 99, 64, 1)',
+                            backgroundColor: 'rgba(251, 99, 64, 0.15)',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Previsão Fluxo Líquido',
+                            data: forecast.map(i => i.net),
+                            borderColor: 'rgba(136, 132, 216, 1)',
+                            fill: false,
+                            tension: 0.25
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    }
+
+    if (cashReportModal) {
+        cashReportModal.addEventListener('shown.bs.modal', loadCashReport);
+    }
+    if (cashRefreshBtn) {
+        cashRefreshBtn.addEventListener('click', loadCashReport);
+    }
+    if (cashGrowthHorizonFilter) {
+        cashGrowthHorizonFilter.addEventListener('change', function () {
+            if (cashReportDataCache) {
+                renderGrowthTargetsTable(cashReportDataCache);
+            }
+        });
     }
 </script>
 @endpush

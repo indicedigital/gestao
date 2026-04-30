@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class FiscalExitNoteController extends Controller
@@ -142,7 +143,26 @@ class FiscalExitNoteController extends Controller
     {
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
-        $fiscal_exit_note->update($this->validatedData($request));
+
+        $validated = $this->validatedData($request, $fiscal_exit_note);
+        if ($request->hasFile('note_file')) {
+            if ($fiscal_exit_note->document_file_path && Storage::disk('public')->exists($fiscal_exit_note->document_file_path)) {
+                Storage::disk('public')->delete($fiscal_exit_note->document_file_path);
+            }
+
+            $file = $request->file('note_file');
+            $validated['document_file_path'] = $file->store('fiscal-exit-notes', 'public');
+            $validated['document_file_original_name'] = $file->getClientOriginalName();
+            $validated['document_file_mime'] = $file->getMimeType();
+        }
+
+        if ($validated['is_issued'] && empty($validated['document_file_path']) && empty($fiscal_exit_note->document_file_path)) {
+            return back()
+                ->withInput()
+                ->withErrors(['note_file' => 'Para marcar como emitida, anexe o arquivo da nota (XML ou PDF).']);
+        }
+
+        $fiscal_exit_note->update($validated);
 
         return redirect()
             ->route('company.accounting.fiscal-exit-notes.index')
@@ -153,6 +173,11 @@ class FiscalExitNoteController extends Controller
     {
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
+
+        if ($fiscal_exit_note->document_file_path && Storage::disk('public')->exists($fiscal_exit_note->document_file_path)) {
+            Storage::disk('public')->delete($fiscal_exit_note->document_file_path);
+        }
+
         $fiscal_exit_note->delete();
 
         return redirect()
@@ -165,6 +190,10 @@ class FiscalExitNoteController extends Controller
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
 
+        if (! $fiscal_exit_note->is_issued && ! $fiscal_exit_note->document_file_path) {
+            return back()->with('info', 'Para marcar como emitida, edite a nota e anexe o arquivo XML ou PDF.');
+        }
+
         $fiscal_exit_note->is_issued = ! $fiscal_exit_note->is_issued;
         $fiscal_exit_note->issued_at = $fiscal_exit_note->is_issued ? now()->toDateString() : null;
         $fiscal_exit_note->save();
@@ -172,6 +201,35 @@ class FiscalExitNoteController extends Controller
         return back()->with('success', $fiscal_exit_note->is_issued
             ? 'Marcado como nota emitida.'
             : 'Marcado como não emitida.');
+    }
+
+    public function markIssued(Request $request, FiscalExitNote $fiscal_exit_note): RedirectResponse
+    {
+        $company = $this->getCurrentCompany();
+        $this->authorizeNote($fiscal_exit_note, $company);
+
+        if ($fiscal_exit_note->is_issued) {
+            return back()->with('info', 'Esta nota já está marcada como emitida.');
+        }
+
+        $validated = $request->validate([
+            'issued_at' => ['nullable', 'date'],
+            'note_file' => ['required', 'file', 'mimes:xml,pdf', 'max:10240'],
+        ]);
+
+        if ($fiscal_exit_note->document_file_path && Storage::disk('public')->exists($fiscal_exit_note->document_file_path)) {
+            Storage::disk('public')->delete($fiscal_exit_note->document_file_path);
+        }
+
+        $file = $request->file('note_file');
+        $fiscal_exit_note->document_file_path = $file->store('fiscal-exit-notes', 'public');
+        $fiscal_exit_note->document_file_original_name = $file->getClientOriginalName();
+        $fiscal_exit_note->document_file_mime = $file->getMimeType();
+        $fiscal_exit_note->is_issued = true;
+        $fiscal_exit_note->issued_at = ! empty($validated['issued_at']) ? $validated['issued_at'] : now()->toDateString();
+        $fiscal_exit_note->save();
+
+        return back()->with('success', 'Nota marcada como emitida com arquivo anexado.');
     }
 
     protected function authorizeNote(FiscalExitNote $note, Company $company): void
@@ -184,7 +242,7 @@ class FiscalExitNoteController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function validatedData(Request $request): array
+    protected function validatedData(Request $request, FiscalExitNote $note): array
     {
         $validated = $request->validate([
             'person_type' => ['required', 'in:pf,pj'],
@@ -204,6 +262,7 @@ class FiscalExitNoteController extends Controller
             'receivable_description' => ['nullable', 'string', 'max:255'],
             'is_issued' => ['sometimes', 'boolean'],
             'issued_at' => ['nullable', 'date'],
+            'note_file' => ['nullable', 'file', 'mimes:xml,pdf', 'max:10240'],
             'internal_notes' => ['nullable', 'string'],
         ]);
 
@@ -212,6 +271,12 @@ class FiscalExitNoteController extends Controller
             $validated['issued_at'] = null;
         } elseif (empty($validated['issued_at'])) {
             $validated['issued_at'] = now()->toDateString();
+        }
+
+        if (! isset($validated['document_file_path'])) {
+            $validated['document_file_path'] = $note->document_file_path;
+            $validated['document_file_original_name'] = $note->document_file_original_name;
+            $validated['document_file_mime'] = $note->document_file_mime;
         }
 
         return $validated;

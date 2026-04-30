@@ -1,10 +1,22 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    @php
+        $companyFaviconUrl = null;
+        if (auth()->check()) {
+            $companyId = session('current_company_id');
+            $companyForFavicon = $companyId
+                ? \App\Models\Company::find($companyId)
+                : auth()->user()?->currentCompany();
+            $companyFaviconUrl = $companyForFavicon?->logoPublicUrl();
+        }
+    @endphp
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') - Índice</title>
+    <link rel="icon" type="image/png" href="{{ $companyFaviconUrl ?: asset('favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ $companyFaviconUrl ?: asset('favicon.ico') }}">
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -1342,6 +1354,10 @@
                         <i class="fas fa-project-diagram"></i>
                         <span>Projetos</span>
                     </a>
+                    <a href="{{ route('company.leads.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.leads.*') ? 'active' : '' }}" data-title="Leads">
+                        <i class="fas fa-bullseye"></i>
+                        <span>Leads</span>
+                    </a>
                     <a href="{{ route('company.contracts.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.contracts.*') ? 'active' : '' }}" data-title="Contratos">
                         <i class="fas fa-file-contract"></i>
                         <span>Contratos</span>
@@ -2222,6 +2238,7 @@
             }, 2000);
         }
     </script>
+    @include('components.ai-assistant-widget')
     @stack('scripts')
 </body>
 </html>
