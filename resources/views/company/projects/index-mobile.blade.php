@@ -50,6 +50,7 @@
             </div>
 
             <div class="mobile-card-item-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                @if($authz->canViewProjectFinancial())
                 <div class="mobile-card-item-field">
                     <div class="mobile-card-item-label" style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Tipo</div>
                     <div class="mobile-card-item-value" style="font-size: 13px; color: #1a202c; font-weight: 500;">
@@ -63,6 +64,7 @@
                     <div class="mobile-card-item-label" style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Valor Total</div>
                     <div class="mobile-card-item-value" style="font-size: 13px; color: #1a202c; font-weight: 500; font-weight: 600;">R$ {{ number_format($project->total_value, 2, ',', '.') }}</div>
                 </div>
+                @endif
 
                 <div class="mobile-card-item-field" style="grid-column: 1 / -1;">
                     <div class="mobile-card-item-label" style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Cliente</div>
@@ -71,11 +73,19 @@
             </div>
 
             <div class="mobile-card-item-actions" style="display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                @if($authz->canViewProjectOverview())
                 <a href="{{ route('company.projects.show', $project) }}" 
                    class="btn btn-info btn-sm" 
                    style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: center; text-decoration: none; color: white;">
                     <i class="fas fa-eye"></i> Ver
                 </a>
+                @else
+                <a href="{{ route('company.projects.kanban', $project) }}" 
+                   class="btn btn-primary btn-sm" 
+                   style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: center; text-decoration: none; color: white;">
+                    <i class="fas fa-columns"></i> Quadro
+                </a>
+                @endif
                 <a href="{{ route('company.projects.edit', $project) }}" 
                    class="btn btn-warning btn-sm" 
                    style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: center; text-decoration: none; color: white;">

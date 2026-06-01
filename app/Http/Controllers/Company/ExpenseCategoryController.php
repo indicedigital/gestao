@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\ExpenseCategory;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 class ExpenseCategoryController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -51,12 +54,14 @@ class ExpenseCategoryController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         return view('company.expense-categories.create', compact('company'));
     }
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
@@ -85,6 +90,7 @@ class ExpenseCategoryController extends Controller
 
     public function edit(ExpenseCategory $expenseCategory)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($expenseCategory, $company);
         
@@ -93,6 +99,7 @@ class ExpenseCategoryController extends Controller
 
     public function update(Request $request, ExpenseCategory $expenseCategory)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($expenseCategory, $company);
         
@@ -111,6 +118,7 @@ class ExpenseCategoryController extends Controller
 
     public function destroy(ExpenseCategory $expenseCategory)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($expenseCategory, $company);
         

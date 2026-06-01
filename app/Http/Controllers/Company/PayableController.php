@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Payable;
 use App\Models\Project;
+use App\Rules\BelongsToCompany;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PayableController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -106,6 +110,7 @@ class PayableController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $employees = Employee::where('company_id', $company->id)->where('status', 'active')->get();
         $projects = Project::where('company_id', $company->id)->get();
@@ -115,11 +120,12 @@ class PayableController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
-            'employee_id' => 'nullable|exists:employees,id',
-            'project_id' => 'nullable|exists:projects,id',
+            'employee_id' => ['nullable', new BelongsToCompany('employees', $company->id)],
+            'project_id' => ['nullable', new BelongsToCompany('projects', $company->id)],
             'type' => 'required|in:salary,service,supplier,other',
             'category' => 'nullable|in:clt,pj,supplier,recurring',
             'description' => 'required|string|max:255',
@@ -150,6 +156,7 @@ class PayableController extends Controller
 
     public function edit(Payable $payable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($payable, $company);
         
@@ -161,6 +168,7 @@ class PayableController extends Controller
 
     public function update(Request $request, Payable $payable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($payable, $company);
 
@@ -171,8 +179,8 @@ class PayableController extends Controller
 
         try {
             $validated = $request->validate([
-                'employee_id' => 'nullable|exists:employees,id',
-                'project_id' => 'nullable|exists:projects,id',
+                'employee_id' => ['nullable', new BelongsToCompany('employees', $company->id)],
+                'project_id' => ['nullable', new BelongsToCompany('projects', $company->id)],
                 'type' => 'required|in:salary,service,supplier,other',
                 'category' => 'nullable|in:clt,pj,supplier,recurring',
                 'description' => 'required|string|max:255',
@@ -211,6 +219,7 @@ class PayableController extends Controller
 
     public function destroy(Payable $payable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($payable, $company);
         
@@ -222,6 +231,7 @@ class PayableController extends Controller
 
     public function markAsPaid(Request $request, Payable $payable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($payable, $company);
         

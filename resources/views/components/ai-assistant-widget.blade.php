@@ -7,21 +7,21 @@
     .ai-assistant-fab { position: fixed; right: 22px; bottom: 24px; z-index: 1080; width: 62px; height: 62px; border-radius: 999px; border: none; background: radial-gradient(circle at 20% 20%, #7c8cff 0%, #4f46e5 45%, #0ea5e9 100%); color: #fff; box-shadow: 0 14px 30px rgba(79,70,229,.45); transition: all .2s ease; }
     .ai-assistant-fab:hover { transform: translateY(-3px) scale(1.02); }
     .ai-modal .modal-dialog { max-width: 980px; }
-    .ai-modal .modal-content { border: 0; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 50px rgba(2,6,23,.25); }
+    .ai-modal .modal-content { border: 0; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-lg); }
     .ai-header { background: linear-gradient(135deg, #0f766e 0%, #0ea5e9 45%, #4f46e5 100%); color: #fff; padding: 14px 18px; }
     .ai-brand { display: flex; align-items: center; gap: 10px; }
     .ai-logo { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); }
     .ai-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
-    .ai-body { background: #f4f7fb; padding: 14px; }
-    .ai-controls { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; margin-bottom: 10px; }
-    .ai-chat-log { height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; }
+    .ai-body { background: var(--bg-body); padding: 14px; }
+    .ai-controls { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 10px; margin-bottom: 10px; }
+    .ai-chat-log { height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px; }
     .ai-chat-row { display: flex; }
     .ai-chat-row.user { justify-content: flex-end; }
     .ai-chat-msg-user, .ai-chat-msg-assistant { max-width: 86%; border-radius: 14px; padding: 10px 12px; line-height: 1.45; font-size: 14px; }
     .ai-chat-msg-user { background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%); color: #fff; box-shadow: 0 6px 16px rgba(59,130,246,.25); }
-    .ai-chat-msg-assistant { background: #f8fafc; border: 1px solid #e2e8f0; color: #0f172a; }
-    .ai-input-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; margin-top: 10px; padding: 10px; }
-    .ai-footer-note { margin-top: 6px; font-size: 11px; color: #94a3b8; text-align: center; }
+    .ai-chat-msg-assistant { background: var(--bg-surface-2); border: 1px solid var(--border-color); color: var(--text-primary); }
+    .ai-input-wrap { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; margin-top: 10px; padding: 10px; }
+    .ai-footer-note { margin-top: 6px; font-size: 11px; color: var(--text-faint); text-align: center; }
 </style>
 
 <button type="button" class="ai-assistant-fab" data-bs-toggle="modal" data-bs-target="#aiAssistantModal" title="Assistente IA Índice">

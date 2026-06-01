@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Lead;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class LeadController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -63,6 +66,7 @@ class LeadController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
 
         return view('company.leads.create', compact('company'));
@@ -70,6 +74,7 @@ class LeadController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $validated = $this->validateLead($request);
         $validated['company_id'] = $company->id;
@@ -83,6 +88,7 @@ class LeadController extends Controller
 
     public function edit(Lead $lead)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($lead, $company);
 
@@ -91,6 +97,7 @@ class LeadController extends Controller
 
     public function update(Request $request, Lead $lead)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($lead, $company);
 
@@ -104,6 +111,7 @@ class LeadController extends Controller
 
     public function destroy(Lead $lead)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($lead, $company);
         $lead->delete();

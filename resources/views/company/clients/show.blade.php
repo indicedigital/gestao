@@ -342,6 +342,8 @@
                 </div>
             </div>
 
+            @include('company.partials.member-access', ['type' => 'client', 'entity' => $client, 'access' => $access ?? null])
+
             <!-- Estatísticas -->
             <div class="card-modern">
                 <div class="card-header">

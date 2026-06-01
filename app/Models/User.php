@@ -22,6 +22,9 @@ class User extends Authenticatable
         'email',
         'password',
         'status',
+    ];
+
+    protected $guarded = [
         'is_super_admin',
     ];
 
@@ -55,8 +58,30 @@ class User extends Authenticatable
     public function companies()
     {
         return $this->belongsToMany(Company::class, 'user_company')
-            ->withPivot('role', 'is_active', 'joined_at')
+            ->withPivot('role', 'is_active', 'joined_at', 'client_id', 'employee_id', 'permission_profile_id')
             ->withTimestamps();
+    }
+
+    public function companyRole(?int $companyId = null): ?string
+    {
+        $companyId ??= session('current_company_id');
+        if (! $companyId) {
+            return null;
+        }
+
+        $membership = \App\Support\CurrentCompanyContext::membership();
+        if ($membership && (int) $membership->id === (int) $companyId) {
+            return $membership->pivot?->role;
+        }
+
+        $pivot = $this->companies()->where('companies.id', $companyId)->first();
+
+        return $pivot?->pivot?->role;
+    }
+
+    public function isClientUser(?int $companyId = null): bool
+    {
+        return $this->companyRole($companyId) === 'client';
     }
 
     /**

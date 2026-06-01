@@ -16,6 +16,8 @@ class RegisterController extends Controller
      */
     public function showRegistrationForm()
     {
+        abort_unless(config('app.allow_registration'), 404);
+
         return view('auth.register');
     }
 
@@ -24,6 +26,7 @@ class RegisterController extends Controller
      */
     public function register(Request $request)
     {
+        abort_unless(config('app.allow_registration'), 404);
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',

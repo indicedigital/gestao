@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
+use App\Rules\BelongsToCompany;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -26,7 +27,9 @@ class CompanyUserController extends Controller
      */
     public function create(Company $company)
     {
-        return view('admin.companies.users.create', compact('company'));
+        $clients = \App\Models\Client::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get(['id', 'name']);
+
+        return view('admin.companies.users.create', compact('company', 'clients'));
     }
 
     /**
@@ -38,7 +41,8 @@ class CompanyUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Password::min(8)],
-            'role' => 'required|in:admin,manager,user',
+            'role' => 'required|in:admin,manager,user,freelancer,client',
+            'client_id' => ['nullable', 'required_if:role,client', new BelongsToCompany('clients', $company->id)],
         ]);
 
         // Cria o usuário
@@ -58,6 +62,7 @@ class CompanyUserController extends Controller
         // Vincula à empresa
         $company->users()->attach($user->id, [
             'role' => $validated['role'],
+            'client_id' => $validated['client_id'] ?? null,
             'is_active' => true,
             'joined_at' => now(),
         ]);
@@ -73,7 +78,8 @@ class CompanyUserController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'role' => 'required|in:admin,manager,user',
+            'role' => 'required|in:admin,manager,user,freelancer,client',
+            'client_id' => ['nullable', 'required_if:role,client', new BelongsToCompany('clients', $company->id)],
         ]);
 
         // Verifica se já está vinculado
@@ -84,6 +90,7 @@ class CompanyUserController extends Controller
         // Vincula à empresa
         $company->users()->attach($validated['user_id'], [
             'role' => $validated['role'],
+            'client_id' => $validated['client_id'] ?? null,
             'is_active' => true,
             'joined_at' => now(),
         ]);
@@ -98,11 +105,13 @@ class CompanyUserController extends Controller
     public function updateRole(Request $request, Company $company, User $user)
     {
         $validated = $request->validate([
-            'role' => 'required|in:owner,admin,manager,user',
+            'role' => 'required|in:owner,admin,manager,user,freelancer,client',
+            'client_id' => ['nullable', new BelongsToCompany('clients', $company->id)],
         ]);
 
         $company->users()->updateExistingPivot($user->id, [
             'role' => $validated['role'],
+            'client_id' => $validated['client_id'] ?? null,
         ]);
 
         return back()->with('success', 'Papel do usuário atualizado com sucesso!');

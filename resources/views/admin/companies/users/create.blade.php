@@ -98,20 +98,29 @@
                         required
                     >
                         <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Administrador</option>
-                        <option value="manager" {{ old('role') === 'manager' ? 'selected' : '' }}>Gerente</option>
-                        <option value="user" {{ old('role', 'user') === 'user' ? 'selected' : '' }}>Usuário</option>
+                        <option value="manager" {{ old('role') === 'manager' ? 'selected' : '' }}>Gestor</option>
+                        <option value="user" {{ old('role', 'user') === 'user' ? 'selected' : '' }}>Colaborador</option>
+                        <option value="freelancer" {{ old('role') === 'freelancer' ? 'selected' : '' }}>Freelancer</option>
+                        <option value="client" {{ old('role') === 'client' ? 'selected' : '' }}>Cliente (Portal)</option>
                     </select>
                     @error('role')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
-                    <small class="form-text text-muted">
-                        <strong>Administrador:</strong> Acesso total à empresa<br>
-                        <strong>Gerente:</strong> Acesso parcial<br>
-                        <strong>Usuário:</strong> Acesso básico
-                    </small>
+                </div>
+                <div class="col-md-6 mb-3" id="client-field" style="display:none;">
+                    <label for="client_id" class="form-label">Cliente vinculado</label>
+                    <select class="form-select @error('client_id') is-invalid @enderror" id="client_id" name="client_id">
+                        <option value="">Selecione o cliente</option>
+                        @foreach($clients ?? [] as $client)
+                            <option value="{{ $client->id }}" @selected(old('client_id') == $client->id)>{{ $client->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('client_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
             </div>
-            
+
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
                 <strong>Empresa:</strong> {{ $company->name }}<br>
@@ -129,4 +138,19 @@
         </form>
     </div>
 </div>
+<script>
+document.getElementById('role')?.addEventListener('change', function () {
+    const field = document.getElementById('client-field');
+    const select = document.getElementById('client_id');
+    if (this.value === 'client') {
+        field.style.display = 'block';
+        select.required = true;
+    } else {
+        field.style.display = 'none';
+        select.required = false;
+        select.value = '';
+    }
+});
+document.getElementById('role')?.dispatchEvent(new Event('change'));
+</script>
 @endsection

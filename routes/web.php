@@ -23,7 +23,16 @@ use App\Http\Controllers\Company\FiscalEntryNoteController;
 use App\Http\Controllers\Company\FiscalExitNoteController;
 use App\Http\Controllers\Company\AccountingReportController;
 use App\Http\Controllers\Company\AiAssistantController;
+use App\Http\Controllers\Company\ProjectKanbanController;
+use App\Http\Controllers\Company\TaskController;
+use App\Http\Controllers\Company\SubtaskController;
+use App\Http\Controllers\Company\DailyController;
+use App\Http\Controllers\Company\ProductivityController;
+use App\Http\Controllers\Company\DeveloperDashboardController;
 use App\Http\Controllers\Company\LeadController;
+use App\Http\Controllers\Company\MemberAccessController;
+use App\Http\Controllers\Company\PermissionProfileController;
+use App\Http\Controllers\Company\TutorialController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
@@ -79,6 +88,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $company = $user->currentCompany();
         if ($company) {
             session(['current_company_id' => $company->id]);
+            if ($user->isClientUser($company->id)) {
+                return redirect()->route('portal.dashboard');
+            }
+
+            $authz = app(\App\Services\CompanyAuthorizationService::class);
+            $firstRoute = $authz->firstAccessibleRouteName();
+            if ($firstRoute) {
+                return redirect()->route($firstRoute);
+            }
+
             return redirect()->route('company.dashboard');
         }
         
@@ -88,23 +107,50 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Rotas da Empresa (requer autenticação, verificação e não ser super admin)
-Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringReceivables::class, \App\Http\Middleware\GenerateFixedExpenses::class])->prefix('company')->name('company.')->group(function () {
+Route::middleware(['auth', 'verified', 'company.member', 'not.client', 'module.access'])->prefix('company')->name('company.')->group(function () {
     // Notificações
     Route::get('/notifications', [NotificationController::class, 'getNotifications'])->name('notifications');
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/developer-dashboard', [DeveloperDashboardController::class, 'index'])->name('developer-dashboard');
     Route::post('/dashboard/update-cash', [DashboardController::class, 'updateCash'])->name('dashboard.update-cash');
     Route::get('/dashboard/cash-report-data', [DashboardController::class, 'cashReportData'])->name('dashboard.cash-report-data');
     Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai-assistant.chat');
+
+    Route::get('/tutorial', [TutorialController::class, 'index'])->name('tutorial');
     
     // Clientes
     Route::get('clients/export/excel', [ClientController::class, 'exportExcel'])->name('clients.export.excel');
     Route::get('clients/export/pdf', [ClientController::class, 'exportPdf'])->name('clients.export.pdf');
     Route::resource('clients', ClientController::class);
+    Route::post('clients/{client}/access', [MemberAccessController::class, 'storeClient'])->name('clients.access.store');
+    Route::put('clients/{client}/access', [MemberAccessController::class, 'updateClient'])->name('clients.access.update');
+    Route::delete('clients/{client}/access', [MemberAccessController::class, 'destroyClient'])->name('clients.access.destroy');
     
     // Projetos
     Route::resource('projects', ProjectController::class);
+    Route::get('projects/{project}/kanban', [ProjectKanbanController::class, 'show'])->name('projects.kanban');
+    Route::get('projects/{project}/dashboard', [ProjectKanbanController::class, 'dashboard'])->name('projects.dashboard');
+    Route::get('projects/{project}/team', [ProjectKanbanController::class, 'team'])->name('projects.team');
+    Route::put('projects/{project}/team', [ProjectKanbanController::class, 'updateTeam'])->name('projects.team.update');
+
+    // Tasks
+    Route::get('tasks/export/excel', [TaskController::class, 'exportExcel'])->name('tasks.export.excel');
+    Route::resource('tasks', TaskController::class);
+    Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.update-status');
+    Route::post('tasks/{task}/comments', [TaskController::class, 'storeComment'])->name('tasks.comments.store');
+    Route::post('tasks/{task}/attachments', [TaskController::class, 'storeAttachment'])->name('tasks.attachments.store');
+    Route::get('tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
+    Route::post('tasks/{task}/subtasks', [SubtaskController::class, 'store'])->name('tasks.subtasks.store');
+    Route::put('tasks/{task}/subtasks/{subtask}', [SubtaskController::class, 'update'])->name('tasks.subtasks.update');
+    Route::delete('tasks/{task}/subtasks/{subtask}', [SubtaskController::class, 'destroy'])->name('tasks.subtasks.destroy');
+
+    // Dailies
+    Route::get('dailies/productivity', [ProductivityController::class, 'index'])->name('dailies.productivity');
+    Route::get('dailies/productivity/tab', [ProductivityController::class, 'tab'])->name('dailies.productivity.tab');
+    Route::get('dailies/export/excel', [DailyController::class, 'exportExcel'])->name('dailies.export.excel');
+    Route::resource('dailies', DailyController::class)->only(['index', 'store', 'destroy']);
 
     // Leads
     Route::resource('leads', LeadController::class)->except(['show']);
@@ -122,6 +168,9 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
     
            // Funcionários
            Route::resource('employees', EmployeeController::class);
+           Route::post('employees/{employee}/access', [MemberAccessController::class, 'storeEmployee'])->name('employees.access.store');
+           Route::put('employees/{employee}/access', [MemberAccessController::class, 'updateEmployee'])->name('employees.access.update');
+           Route::delete('employees/{employee}/access', [MemberAccessController::class, 'destroyEmployee'])->name('employees.access.destroy');
            Route::post('employees/generate-payroll', [EmployeeController::class, 'generatePayroll'])->name('employees.generate-payroll');
            
            // Despesas (rota específica antes do resource para não conflitar com {expense})
@@ -133,6 +182,15 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
            
            // Categorias de Despesas (Configurações)
            Route::resource('expense-categories', ExpenseCategoryController::class);
+
+           // Perfis de permissão (admin empresa)
+           Route::get('permission-profiles', [PermissionProfileController::class, 'index'])->name('permission-profiles.index');
+           Route::get('permission-profiles/create', [PermissionProfileController::class, 'create'])->name('permission-profiles.create');
+           Route::post('permission-profiles', [PermissionProfileController::class, 'store'])->name('permission-profiles.store');
+           Route::get('permission-profiles/{permissionProfile}/edit', [PermissionProfileController::class, 'edit'])->name('permission-profiles.edit');
+           Route::put('permission-profiles/{permissionProfile}', [PermissionProfileController::class, 'update'])->name('permission-profiles.update');
+           Route::delete('permission-profiles/{permissionProfile}', [PermissionProfileController::class, 'destroy'])->name('permission-profiles.destroy');
+           Route::post('permission-profiles/assign', [PermissionProfileController::class, 'assignMember'])->name('permission-profiles.assign');
 
            // Contabilidade
            Route::prefix('accounting')->name('accounting.')->group(function () {
@@ -147,8 +205,22 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\GenerateRecurringRec
            });
 });
 
+// Portal do Cliente
+Route::middleware(['auth', 'verified', 'company.member', 'client.role'])->prefix('portal')->name('portal.')->group(function () {
+    Route::get('/tutorial', [TutorialController::class, 'index'])->name('tutorial');
+    Route::get('/', [\App\Http\Controllers\Portal\ClientPortalController::class, 'dashboard'])->name('dashboard');
+    Route::get('/projects/{project}/kanban', [\App\Http\Controllers\Portal\ClientPortalController::class, 'kanban'])->name('kanban');
+    Route::get('/tasks/create', [\App\Http\Controllers\Portal\ClientPortalController::class, 'createTask'])->name('tasks.create');
+    Route::post('/tasks', [\App\Http\Controllers\Portal\ClientPortalController::class, 'storeTask'])->name('tasks.store');
+    Route::get('/tasks/{task}', [\App\Http\Controllers\Portal\ClientPortalController::class, 'showTask'])->name('tasks.show');
+    Route::post('/tasks/{task}/comments', [\App\Http\Controllers\Portal\ClientPortalController::class, 'storeComment'])->name('tasks.comments.store');
+    Route::post('/tasks/{task}/attachments', [\App\Http\Controllers\Portal\ClientPortalController::class, 'storeAttachment'])->name('tasks.attachments.store');
+    Route::get('/tasks/{task}/attachments/{attachment}/download', [\App\Http\Controllers\Portal\ClientPortalController::class, 'downloadAttachment'])->name('tasks.attachments.download');
+    Route::post('/tasks/{task}/approve', [\App\Http\Controllers\Portal\ClientPortalController::class, 'approveHomologation'])->name('tasks.approve');
+});
+
 // Rotas de Admin (requer autenticação e verificação de e-mail)
-Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'super.admin'])->prefix('admin')->name('admin.')->group(function () {
     // Dashboard Admin
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Company;
@@ -15,6 +16,8 @@ use Illuminate\View\View;
 
 class FiscalExitNoteController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -127,6 +130,7 @@ class FiscalExitNoteController extends Controller
 
     public function edit(FiscalExitNote $fiscal_exit_note): View
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
         $fiscal_exit_note->load(['receivable', 'receivablePayment', 'client']);
@@ -141,6 +145,7 @@ class FiscalExitNoteController extends Controller
 
     public function update(Request $request, FiscalExitNote $fiscal_exit_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
 
@@ -171,6 +176,7 @@ class FiscalExitNoteController extends Controller
 
     public function destroy(FiscalExitNote $fiscal_exit_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
 
@@ -187,6 +193,7 @@ class FiscalExitNoteController extends Controller
 
     public function toggleIssued(FiscalExitNote $fiscal_exit_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
 
@@ -205,6 +212,7 @@ class FiscalExitNoteController extends Controller
 
     public function markIssued(Request $request, FiscalExitNote $fiscal_exit_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_exit_note, $company);
 

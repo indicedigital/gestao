@@ -84,5 +84,7 @@
             </dl>
         </div>
     </div>
+
+    @include('company.partials.member-access', ['type' => 'employee', 'entity' => $employee, 'access' => $access ?? null])
 </div>
 @endsection

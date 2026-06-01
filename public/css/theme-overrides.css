@@ -1,0 +1,295 @@
+/**
+ * Overrides carregados APÓS @stack('styles') — corrige estilos inline light-only das páginas legadas.
+ */
+
+/* ===== Reset de body forçado por páginas ===== */
+body {
+    background: var(--bg-body) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ===== Dashboard financeiro ===== */
+.kpi-card {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+    color: var(--text-primary) !important;
+}
+.kpi-card:hover {
+    box-shadow: var(--shadow-md) !important;
+}
+.kpi-card h6 { color: var(--text-muted) !important; }
+.kpi-card h3 { color: var(--text-primary) !important; }
+.kpi-card.primary { border-top-color: var(--primary-color) !important; }
+.kpi-card.success { border-top-color: var(--color-success) !important; }
+.kpi-card.danger { border-top-color: var(--color-danger) !important; }
+.kpi-card.warning { border-top-color: var(--color-warning) !important; }
+.kpi-card.info { border-top-color: var(--color-info) !important; }
+
+.card-modern,
+.card-modern .card-header {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+.card-modern .card-body { color: var(--text-secondary) !important; }
+
+.page-header-modern h1 { color: var(--text-primary) !important; }
+.page-header-modern p { color: var(--text-muted) !important; }
+
+.cash-indicator-card {
+    background: var(--bg-surface-2) !important;
+    border-color: var(--border-color) !important;
+}
+.cash-indicator-card .label { color: var(--text-muted) !important; }
+.cash-indicator-card .value { color: var(--text-primary) !important; }
+.cash-indicator-card.highlight {
+    background: var(--highlight-bg) !important;
+    border-color: var(--highlight-border) !important;
+}
+
+.operational-indicator-item {
+    background: var(--bg-surface-2) !important;
+    border-color: var(--border-color) !important;
+}
+.operational-indicator-item:hover {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+.stat-label { color: var(--text-muted) !important; }
+.stat-value { color: var(--text-primary) !important; }
+
+.table-overdue { background-color: var(--table-danger-bg) !important; }
+
+/* ===== Páginas financeiras / CRUD legado ===== */
+.filter-card,
+.filters-card,
+.page-card,
+.content-card,
+.data-card,
+.stats-card,
+.summary-card,
+.detail-card,
+.info-box,
+.stat-card {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.filter-bar,
+.toolbar,
+.page-toolbar,
+.table-toolbar {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+.table-container,
+.table-wrapper,
+.table-responsive {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+.table thead th {
+    background: var(--bg-surface-2) !important;
+    color: var(--text-muted) !important;
+    border-color: var(--border-color) !important;
+}
+.table tbody td {
+    color: var(--text-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+.table tbody tr:hover td {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.empty-state {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+}
+
+/* ===== Leads / clientes / fornecedores ===== */
+.lead-card,
+.client-card,
+.supplier-card,
+.contract-card,
+.expense-card {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+.lead-status,
+.status-badge,
+.priority-badge {
+    border: 1px solid var(--border-color);
+}
+
+.detail-section,
+.info-section,
+.profile-section {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+.detail-section h5,
+.info-section h5,
+.section-title {
+    color: var(--text-primary) !important;
+}
+.detail-label,
+.info-label {
+    color: var(--text-muted) !important;
+}
+.detail-value,
+.info-value {
+    color: var(--text-primary) !important;
+}
+
+/* ===== Mobile layout cards ===== */
+.mobile-card,
+.mobile-stat-card,
+.mobile-filter,
+.mobile-search,
+.mobile-list-item,
+.mobile-card-item {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.mobile-card-item-title { color: var(--text-primary) !important; }
+.mobile-card-item-label { color: var(--text-muted) !important; }
+.mobile-card-item-value { color: var(--text-secondary) !important; }
+
+.mobile-header {
+    background: var(--header-bg) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+.mobile-header-title { color: var(--text-primary) !important; }
+.mobile-header-icon {
+    background: var(--bg-surface-2) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.mobile-bottom-nav,
+.bottom-nav {
+    background: var(--bg-surface) !important;
+    border-top-color: var(--border-color) !important;
+}
+
+/* ===== Portal kanban inline ===== */
+.portal-kanban-column,
+.kanban-column {
+    background: var(--bg-surface-2) !important;
+    border-color: var(--border-color) !important;
+}
+.portal-kanban-card,
+.kanban-card,
+.task-card {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.portal-kanban-card:hover,
+.kanban-card:hover {
+    border-color: var(--primary-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+/* ===== Accounting report ===== */
+.report-section,
+.report-card,
+.fiscal-summary {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* ===== Tutorial dark mode ===== */
+[data-theme="dark"] .tutorial-hero-inner {
+    background: linear-gradient(135deg, #0f1117 0%, #1a1f35 55%, #2d2a5e 100%) !important;
+}
+[data-theme="dark"] .tutorial-sidebar-inner,
+[data-theme="dark"] .tutorial-section,
+[data-theme="dark"] .tutorial-empty {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .tutorial-sidebar-head {
+    background: linear-gradient(180deg, var(--bg-surface-2) 0%, var(--bg-surface) 100%) !important;
+}
+[data-theme="dark"] .tutorial-toc a:hover {
+    background: var(--bg-hover) !important;
+}
+[data-theme="dark"] .tutorial-step {
+    background: var(--bg-surface-2) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .tutorial-step-marker {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--primary-color) !important;
+}
+[data-theme="dark"] .tutorial-flow {
+    background: var(--bg-surface-2) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .tutorial-flow-steps li {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .tutorial-section h2,
+[data-theme="dark"] .tutorial-step-body h3 {
+    color: var(--text-primary) !important;
+}
+[data-theme="dark"] .tutorial-step-body p,
+[data-theme="dark"] .tutorial-section-summary {
+    color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .tutorial-tip {
+    background: rgba(255, 138, 101, 0.1) !important;
+    border-color: rgba(255, 138, 101, 0.25) !important;
+    color: var(--color-warning) !important;
+}
+
+/* ===== Productivity / developer semantic colors in dark ===== */
+[data-theme="dark"] .prod-kpi.success .prod-kpi-value,
+[data-theme="dark"] .prod-trend.up { color: var(--color-success) !important; }
+[data-theme="dark"] .prod-kpi.danger .prod-kpi-value,
+[data-theme="dark"] .prod-trend.down { color: var(--color-danger) !important; }
+[data-theme="dark"] .prod-kpi.warning .prod-kpi-value { color: var(--color-warning) !important; }
+[data-theme="dark"] .prod-kpi.info .prod-kpi-value,
+[data-theme="dark"] .prod-trend.stable { color: var(--primary-color) !important; }
+
+/* ===== Login page left panel ===== */
+[data-theme="dark"] .login-left {
+    background: linear-gradient(135deg, #0f1117 0%, #161b22 100%) !important;
+}
+[data-theme="light"] .login-left {
+    background: linear-gradient(135deg, var(--bg-surface-2) 0%, var(--bg-surface-3) 100%) !important;
+}
+
+/* ===== Generic white backgrounds in inline styles ===== */
+[style*="background: white"],
+[style*="background:#fff"],
+[style*="background: #fff"],
+[style*="background-color: white"],
+[style*="background-color:#fff"],
+[style*="background-color: #fff"],
+[style*="background-color: #ffffff"],
+[style*="background: #ffffff"] {
+    background: var(--bg-surface) !important;
+}
+
+/* ===== Chart.js canvas containers ===== */
+.chart-container,
+.chart-wrapper,
+.chart-box {
+    background: transparent !important;
+}

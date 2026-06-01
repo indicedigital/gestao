@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Services\CompanyUserProvisioningService;
 use App\Services\PayrollService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class EmployeeController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -53,12 +57,14 @@ class EmployeeController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         return view('company.employees.create', compact('company'));
     }
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
@@ -99,19 +105,25 @@ class EmployeeController extends Controller
         $this->authorizeAccess($employee, $company);
         
         $employee->load('contracts', 'projects', 'payables');
-        return view('company.employees.show', compact('employee', 'company'));
+        $access = app(CompanyUserProvisioningService::class)->employeeAccess($company, $employee);
+
+        return view('company.employees.show', compact('employee', 'company', 'access'));
     }
 
     public function edit(Employee $employee)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($employee, $company);
         
-        return view('company.employees.edit', compact('employee', 'company'));
+        $access = app(CompanyUserProvisioningService::class)->employeeAccess($company, $employee);
+
+        return view('company.employees.edit', compact('employee', 'company', 'access'));
     }
 
     public function update(Request $request, Employee $employee)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($employee, $company);
         
@@ -152,6 +164,7 @@ class EmployeeController extends Controller
 
     public function destroy(Employee $employee)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($employee, $company);
         
@@ -168,6 +181,7 @@ class EmployeeController extends Controller
     public function generatePayroll()
     {
         $company = $this->getCurrentCompany();
+        abort_unless(app(\App\Services\CompanyAuthorizationService::class)->canManage(), 403, 'Sem permissão para gerar folha de pagamento.');
         
         $payrollService = new PayrollService();
         $payrollService->updateMonthlyPayroll($company);

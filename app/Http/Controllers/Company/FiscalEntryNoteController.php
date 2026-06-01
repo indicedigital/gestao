@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Company;
@@ -15,6 +16,8 @@ use Illuminate\View\View;
 
 class FiscalEntryNoteController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -103,6 +106,7 @@ class FiscalEntryNoteController extends Controller
 
     public function create(): View
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $clients = Client::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get();
 
@@ -111,6 +115,7 @@ class FiscalEntryNoteController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $data = $this->validatedData($request, $company);
         $data['company_id'] = $company->id;
@@ -123,6 +128,7 @@ class FiscalEntryNoteController extends Controller
 
     public function edit(FiscalEntryNote $fiscal_entry_note): View
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_entry_note, $company);
         $clients = Client::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get();
@@ -136,6 +142,7 @@ class FiscalEntryNoteController extends Controller
 
     public function update(Request $request, FiscalEntryNote $fiscal_entry_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_entry_note, $company);
         $fiscal_entry_note->update($this->validatedData($request, $company));
@@ -147,6 +154,7 @@ class FiscalEntryNoteController extends Controller
 
     public function destroy(FiscalEntryNote $fiscal_entry_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_entry_note, $company);
         $fiscal_entry_note->delete();
@@ -158,6 +166,7 @@ class FiscalEntryNoteController extends Controller
 
     public function toggleIssued(FiscalEntryNote $fiscal_entry_note): RedirectResponse
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeNote($fiscal_entry_note, $company);
 

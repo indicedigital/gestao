@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\Payable;
 use App\Models\Supplier;
+use App\Rules\BelongsToCompany;
 use App\Services\FixedExpenseService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 
 class ExpenseController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -328,6 +332,7 @@ class ExpenseController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $categories = ExpenseCategory::where('company_id', $company->id)->where('is_active', true)->orderBy('name')->get();
         $suppliers = Supplier::where('company_id', $company->id)->where('is_active', true)->orderBy('name')->get();
@@ -336,14 +341,15 @@ class ExpenseController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
             'type' => 'required|in:fixed,variable',
             'description' => 'required|string|max:255',
             'value' => 'required|numeric|min:0',
-            'expense_category_id' => 'nullable|exists:expense_categories,id',
-            'supplier_id' => 'nullable|exists:suppliers,id',
+            'expense_category_id' => ['nullable', new BelongsToCompany('expense_categories', $company->id)],
+            'supplier_id' => ['nullable', new BelongsToCompany('suppliers', $company->id)],
             'due_date_day' => 'required_if:type,fixed|nullable|integer|min:1|max:31',
             'due_date' => 'required_if:type,variable|nullable|date',
             'notes' => 'nullable|string',
@@ -390,6 +396,7 @@ class ExpenseController extends Controller
 
     public function edit(Expense $expense)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($expense, $company);
         
@@ -401,6 +408,7 @@ class ExpenseController extends Controller
 
     public function update(Request $request, Expense $expense)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($expense, $company);
         
@@ -408,8 +416,8 @@ class ExpenseController extends Controller
             'type' => 'required|in:fixed,variable',
             'description' => 'required|string|max:255',
             'value' => 'required|numeric|min:0',
-            'expense_category_id' => 'nullable|exists:expense_categories,id',
-            'supplier_id' => 'nullable|exists:suppliers,id',
+            'expense_category_id' => ['nullable', new BelongsToCompany('expense_categories', $company->id)],
+            'supplier_id' => ['nullable', new BelongsToCompany('suppliers', $company->id)],
             'due_date_day' => 'required_if:type,fixed|nullable|integer|min:1|max:31',
             'due_date' => 'required_if:type,variable|nullable|date',
             'notes' => 'nullable|string',
@@ -432,6 +440,7 @@ class ExpenseController extends Controller
 
     public function destroy(Expense $expense)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($expense, $company);
         

@@ -2,98 +2,102 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Concerns\InteractsWithCompany;
+use App\Http\Controllers\Concerns\RendersProjectTab;
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Project;
+use App\Models\Task;
+use App\Rules\BelongsToCompany;
+use App\Services\ProjectContractSyncService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 
 class ProjectController extends Controller
 {
-    protected function getCurrentCompany(): Company
-    {
-        $user = Auth::user();
-        
-        // Super admin não pode acessar rotas de empresa
-        if ($user->is_super_admin ?? false) {
-            abort(403, 'Super administradores devem usar o painel administrativo.');
-        }
-        
-        $companyId = session('current_company_id');
-        if (!$companyId) {
-            $company = $user->currentCompany();
-            if ($company) {
-                session(['current_company_id' => $company->id]);
-                return $company;
-            }
-            abort(403, 'Você não possui uma empresa vinculada.');
-        }
-        return Company::findOrFail($companyId);
-    }
+    use InteractsWithCompany, RendersProjectTab;
 
     public function index(Request $request)
     {
         $company = $this->getCurrentCompany();
-        $projects = Project::where('company_id', $company->id)
-            ->with('client')
-            ->latest()
-            ->paginate(15);
-        
-        // Detecta se é mobile
-        $isMobile = $request->has('mobile') || 
-                   $request->cookie('is_mobile') === '1' ||
-                   (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
-        
-        if ($isMobile) {
-            return view('company.projects.index-mobile', compact('projects', 'company'));
+        $authz = $this->authz();
+
+        $query = Project::where('company_id', $company->id)->with('client:id,name');
+
+        if (! $authz->hasFullDataScope('projects')) {
+            $authz->applyProjectScope($query);
         }
-        
-        return view('company.projects.index', compact('projects', 'company'));
+
+        $projects = $query->latest()->paginate(15);
+
+        $authz = $this->authz();
+
+        $isMobile = $request->has('mobile') ||
+            $request->cookie('is_mobile') === '1' ||
+            (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT']));
+
+        if ($isMobile) {
+            return view('company.projects.index-mobile', compact('projects', 'company', 'authz'));
+        }
+
+        return view('company.projects.index', compact('projects', 'company', 'authz'));
     }
 
     public function create()
     {
+        abort_unless($this->authz()->canManageProjects(), 403);
+
         $company = $this->getCurrentCompany();
-        $clients = Client::where('company_id', $company->id)->where('status', 'active')->get();
         $contracts = Contract::where('company_id', $company->id)
             ->where('status', 'active')
             ->whereIn('type', ['client_recurring', 'client_fixed'])
+            ->with('client:id,name')
+            ->orderBy('name')
             ->get();
-        
-        return view('company.projects.create', compact('company', 'clients', 'contracts'));
+
+        return view('company.projects.create', compact('company', 'contracts'));
     }
 
     public function store(Request $request)
     {
+        abort_unless($this->authz()->canManageProjects(), 403);
+
         $company = $this->getCurrentCompany();
-        
+
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'contract_id' => 'nullable|exists:contracts,id',
+            'contract_id' => ['required', new BelongsToCompany('contracts', $company->id)],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'type' => 'required|in:fixed,recurring',
-            'total_value' => 'required|numeric|min:0',
-            'installments' => 'required|integer|min:1',
-            'status' => 'nullable|in:planning,in_progress,paused,completed,cancelled',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'status' => 'nullable|in:active,paused,implementing,completed,cancelled,planning,in_progress',
             'deadline' => 'nullable|date',
             'scope' => 'nullable|string',
-            'deliverables' => 'nullable|array',
+            'deliverables' => 'nullable|string',
         ]);
 
-        $validated['company_id'] = $company->id;
-        if (!isset($validated['status'])) {
-            $validated['status'] = 'planning';
-        }
-        if (isset($validated['deliverables'])) {
-            $validated['deliverables'] = json_encode($validated['deliverables']);
+        $contract = Contract::where('company_id', $company->id)
+            ->whereIn('type', ['client_recurring', 'client_fixed'])
+            ->findOrFail($validated['contract_id']);
+
+        try {
+            $fromContract = app(ProjectContractSyncService::class)->apply($contract);
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['contract_id' => $e->getMessage()]);
         }
 
-        Project::create($validated);
+        $payload = array_merge($fromContract, [
+            'company_id' => $company->id,
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'status' => $validated['status'] ?? 'implementing',
+            'deadline' => $validated['deadline'] ?? null,
+            'scope' => $validated['scope'] ?? null,
+        ]);
+
+        if (! empty($validated['deliverables'])) {
+            $payload['deliverables'] = array_filter(array_map('trim', explode("\n", $validated['deliverables'])));
+        }
+
+        Project::create($payload);
 
         return redirect()->route('company.projects.index')
             ->with('success', 'Projeto criado com sucesso!');
@@ -101,53 +105,81 @@ class ProjectController extends Controller
 
     public function show(Project $project)
     {
+        abort_unless($this->authz()->canViewProject($project), 403);
+
+        if (! $this->authz()->canViewProjectOverview()) {
+            return redirect()->route('company.projects.kanban', $project);
+        }
+
         $company = $this->getCurrentCompany();
-        $this->authorizeAccess($project, $company);
-        
-        $project->load('client', 'contract', 'employees', 'costs', 'receivables');
-        return view('company.projects.show', compact('project', 'company'));
+        $project->load([
+            'client', 'contract', 'employees',
+            'tasks' => fn ($q) => $q->select('id', 'project_id', 'status', 'sla_deadline'),
+        ]);
+
+        $openTasks = $project->tasks->where('status', '!=', 'completed')->count();
+        $closedTasks = $project->tasks->where('status', 'completed')->count();
+        $overdueTasks = $project->tasks->filter(fn ($t) => $t->status !== 'completed' && $t->isOverdue())->count();
+
+        return $this->renderProjectTab('show', compact('project', 'company', 'openTasks', 'closedTasks', 'overdueTasks'));
     }
 
     public function edit(Project $project)
     {
+        abort_unless($this->authz()->canManageProjects(), 403);
+
         $company = $this->getCurrentCompany();
-        $this->authorizeAccess($project, $company);
-        
-        $clients = Client::where('company_id', $company->id)->where('status', 'active')->get();
         $contracts = Contract::where('company_id', $company->id)
             ->where('status', 'active')
             ->whereIn('type', ['client_recurring', 'client_fixed'])
+            ->with('client:id,name')
+            ->orderBy('name')
             ->get();
-        
-        return view('company.projects.edit', compact('project', 'company', 'clients', 'contracts'));
+
+        return view('company.projects.edit', compact('project', 'company', 'contracts'));
     }
 
     public function update(Request $request, Project $project)
     {
+        abort_unless($this->authz()->canManageProjects(), 403);
+
         $company = $this->getCurrentCompany();
-        $this->authorizeAccess($project, $company);
-        
+
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'contract_id' => 'nullable|exists:contracts,id',
+            'contract_id' => ['required', new BelongsToCompany('contracts', $company->id)],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'type' => 'required|in:fixed,recurring',
-            'total_value' => 'required|numeric|min:0',
-            'installments' => 'required|integer|min:1',
-            'status' => 'nullable|in:planning,in_progress,paused,completed,cancelled',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'status' => 'nullable|in:active,paused,implementing,completed,cancelled,planning,in_progress',
             'deadline' => 'nullable|date',
             'scope' => 'nullable|string',
-            'deliverables' => 'nullable|array',
+            'deliverables' => 'nullable|string',
         ]);
 
-        if (isset($validated['deliverables'])) {
-            $validated['deliverables'] = json_encode($validated['deliverables']);
+        $contract = Contract::where('company_id', $company->id)
+            ->whereIn('type', ['client_recurring', 'client_fixed'])
+            ->findOrFail($validated['contract_id']);
+
+        try {
+            $fromContract = app(ProjectContractSyncService::class)->apply($contract);
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['contract_id' => $e->getMessage()]);
         }
 
-        $project->update($validated);
+        $payload = array_merge($fromContract, [
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'status' => $validated['status'] ?? $project->status,
+            'deadline' => $validated['deadline'] ?? null,
+            'scope' => $validated['scope'] ?? null,
+        ]);
+
+        if (! empty($validated['deliverables'])) {
+            $payload['deliverables'] = array_filter(array_map('trim', explode("\n", $validated['deliverables'])));
+        } else {
+            $payload['deliverables'] = null;
+        }
+
+        $project->update($payload);
 
         return redirect()->route('company.projects.index')
             ->with('success', 'Projeto atualizado com sucesso!');
@@ -155,19 +187,11 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
-        $company = $this->getCurrentCompany();
-        $this->authorizeAccess($project, $company);
-        
+        abort_unless($this->authz()->canManageProjects(), 403);
+
         $project->delete();
 
         return redirect()->route('company.projects.index')
             ->with('success', 'Projeto removido com sucesso!');
-    }
-
-    protected function authorizeAccess(Project $project, Company $company): void
-    {
-        if ($project->company_id !== $company->id) {
-            abort(403, 'Acesso negado.');
-        }
     }
 }

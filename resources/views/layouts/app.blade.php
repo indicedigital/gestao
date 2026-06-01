@@ -4,16 +4,32 @@
     @php
         $companyFaviconUrl = null;
         if (auth()->check()) {
-            $companyId = session('current_company_id');
-            $companyForFavicon = $companyId
-                ? \App\Models\Company::find($companyId)
-                : auth()->user()?->currentCompany();
+            $companyForFavicon = $currentCompany ?? null;
+            if (! $companyForFavicon) {
+                $companyId = session('current_company_id');
+                $companyForFavicon = $companyId
+                    ? \App\Models\Company::find($companyId)
+                    : auth()->user()?->currentCompany();
+            }
             $companyFaviconUrl = $companyForFavicon?->logoPublicUrl();
         }
     @endphp
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+        (function () {
+            var t = localStorage.getItem('app-theme');
+            if (!t && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+            }
+        })();
+    </script>
     <title>@yield('title', 'Dashboard') - Índice</title>
     <link rel="icon" type="image/png" href="{{ $companyFaviconUrl ?: asset('favicon.ico') }}">
     <link rel="shortcut icon" href="{{ $companyFaviconUrl ?: asset('favicon.ico') }}">
@@ -22,27 +38,28 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
+    @if(request()->routeIs('company.projects.*', 'company.tasks.*', 'company.dailies.*', 'portal.kanban', 'portal.tasks.show'))
+    <link rel="stylesheet" href="{{ asset('css/work-module.css') }}">
+    @endif
+    @if(request()->routeIs('portal.*'))
+    <link rel="stylesheet" href="{{ asset('css/portal.css') }}">
+    @endif
     
     <style>
         :root {
-            --primary-color: #5e72e4;
-            --primary-dark: #4c63d2;
-            --secondary-color: #8392ab;
-            --success-color: #2dce89;
-            --danger-color: #f5365c;
-            --warning-color: #fb6340;
-            --info-color: #11cdef;
-            --light-color: #f8f9fa;
-            --dark-color: #1a202c;
             --sidebar-width: 280px;
             --sidebar-width-collapsed: 80px;
             --header-height: 70px;
-            --border-color: #e2e8f0;
-            --text-muted: #64748b;
+            --dark-color: var(--text-primary);
+            --light-color: var(--bg-surface-2);
+            --secondary-color: #8392ab;
+            --success-color: var(--color-success);
+            --danger-color: var(--color-danger);
+            --warning-color: var(--color-warning);
+            --info-color: var(--color-info);
         }
         
         * {
@@ -53,8 +70,8 @@
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background-color: #f7fafc;
-            color: var(--dark-color);
+            background-color: var(--bg-body);
+            color: var(--text-primary);
             font-size: 14px;
             line-height: 1.6;
             overflow-x: hidden;
@@ -67,7 +84,7 @@
             left: 0;
             width: var(--sidebar-width);
             height: 100vh;
-            background: #ffffff;
+            background: var(--sidebar-bg);
             border-right: 1px solid var(--border-color);
             overflow-y: auto;
             z-index: 1000;
@@ -79,18 +96,18 @@
         }
         
         .sidebar::-webkit-scrollbar-track {
-            background: #f1f1f1;
+            background: var(--scrollbar-track);
         }
         
         .sidebar::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
+            background: var(--scrollbar-thumb);
             border-radius: 3px;
         }
         
         .sidebar-header {
             padding: 24px 20px;
             border-bottom: 1px solid var(--border-color);
-            background: #ffffff;
+            background: var(--sidebar-bg);
             position: relative;
             display: flex;
             align-items: center;
@@ -99,7 +116,7 @@
         .sidebar-logo {
             font-size: 20px;
             font-weight: 700;
-            color: var(--dark-color);
+            color: var(--text-primary);
             text-decoration: none;
             display: flex;
             align-items: center;
@@ -133,13 +150,13 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: var(--text-muted);
+            color: var(--sidebar-section);
             margin-bottom: 8px;
         }
         
         .sidebar-menu-item {
             padding: 10px 20px;
-            color: #4a5568;
+            color: var(--sidebar-text);
             text-decoration: none;
             display: flex;
             align-items: center;
@@ -155,18 +172,19 @@
         .sidebar-menu-item span {
             transition: opacity 0.3s, width 0.3s;
             white-space: nowrap;
+            color: inherit;
         }
         
         .sidebar-menu-item i {
             width: 20px;
             font-size: 18px;
-            color: var(--text-muted);
+            color: var(--sidebar-icon);
             transition: color 0.2s;
         }
         
         .sidebar-menu-item:hover {
-            background-color: #f7fafc;
-            color: var(--dark-color);
+            background-color: var(--sidebar-hover-bg);
+            color: var(--text-primary);
         }
         
         .sidebar-menu-item:hover i {
@@ -174,13 +192,13 @@
         }
         
         .sidebar-menu-item.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            background: var(--sidebar-active-bg);
+            color: var(--sidebar-active-text);
+            box-shadow: var(--sidebar-active-shadow);
         }
         
         .sidebar-menu-item.active i {
-            color: white;
+            color: var(--sidebar-active-icon);
         }
         
         /* Sidebar Collapsed State */
@@ -233,16 +251,16 @@
             width: 30px;
             height: 30px;
             border-radius: 50%;
-            background: white;
+            background: var(--bg-surface);
             border: 2px solid var(--border-color);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             z-index: 1001;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-sm);
             transition: all 0.3s;
-            color: var(--text-muted);
+            color: var(--sidebar-icon);
         }
         
         .sidebar-toggle-btn:hover {
@@ -277,13 +295,13 @@
             transform: translateY(-50%);
             margin-left: 12px;
             padding: 8px 12px;
-            background: var(--dark-color);
-            color: white;
+            background: var(--tooltip-bg);
+            color: var(--text-primary);
             border-radius: 8px;
             font-size: 12px;
             white-space: nowrap;
             z-index: 1002;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: var(--shadow-md);
             pointer-events: none;
         }
         
@@ -295,7 +313,7 @@
             transform: translateY(-50%);
             margin-left: 6px;
             border: 6px solid transparent;
-            border-right-color: var(--dark-color);
+            border-right-color: var(--tooltip-bg);
             z-index: 1003;
             pointer-events: none;
         }
@@ -305,7 +323,7 @@
             margin-left: var(--sidebar-width);
             min-height: 100vh;
             transition: all 0.3s;
-            background: #f7fafc;
+            background: var(--bg-body);
         }
         
         .sidebar.collapsed ~ .main-content {
@@ -315,7 +333,7 @@
         /* Header - Design Moderno */
         .header {
             height: var(--header-height);
-            background: #ffffff;
+            background: var(--header-bg);
             border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
@@ -337,7 +355,7 @@
         .page-title-header {
             font-size: 20px;
             font-weight: 600;
-            color: var(--dark-color);
+            color: var(--text-primary);
         }
         
         .header-center {
@@ -357,14 +375,14 @@
             padding: 10px 45px 10px 16px;
             width: 100%;
             font-size: 14px;
-            background: #f7fafc;
+            background: var(--bg-input);
             transition: all 0.2s;
         }
         
         .search-box input:focus {
             outline: none;
             border-color: var(--primary-color);
-            background: white;
+            background: var(--bg-surface);
             box-shadow: 0 0 0 3px rgba(94, 114, 228, 0.1);
         }
         
@@ -389,8 +407,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #f7fafc;
-            color: var(--dark-color);
+            background: var(--bg-input);
+            color: var(--text-primary);
             cursor: pointer;
             transition: all 0.2s;
             position: relative;
@@ -426,14 +444,14 @@
             max-height: 500px;
             border-radius: 16px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border-color);
             overflow: hidden;
         }
         
         .notifications-header {
             padding: 20px;
-            border-bottom: 1px solid #e2e8f0;
-            background: white;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-surface);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -443,7 +461,7 @@
             margin: 0;
             font-weight: 600;
             font-size: 16px;
-            color: #1a202c;
+            color: var(--text-primary);
         }
         
         .notifications-header a {
@@ -460,12 +478,12 @@
         .notifications-body {
             max-height: 400px;
             overflow-y: auto;
-            background: white;
+            background: var(--bg-surface);
         }
         
         .notification-item {
             padding: 16px 20px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid var(--border-subtle);
             cursor: pointer;
             transition: background 0.2s;
             display: flex;
@@ -473,7 +491,7 @@
         }
         
         .notification-item:hover {
-            background: #f8fafc;
+            background: var(--bg-hover);
         }
         
         .notification-item:last-child {
@@ -491,10 +509,10 @@
             flex-shrink: 0;
         }
         
-        .notification-icon.danger { background: #fee2e2; color: #f5365c; }
-        .notification-icon.warning { background: #fef3c7; color: #fb6340; }
-        .notification-icon.info { background: #dbeafe; color: #11cdef; }
-        .notification-icon.success { background: #d1fae5; color: #2dce89; }
+        .notification-icon.danger { background: var(--notif-danger-bg); color: var(--color-danger); }
+        .notification-icon.warning { background: var(--notif-warning-bg); color: var(--color-warning); }
+        .notification-icon.info { background: var(--notif-info-bg); color: var(--color-info); }
+        .notification-icon.success { background: var(--notif-success-bg); color: var(--color-success); }
         
         .notification-content {
             flex: 1;
@@ -504,27 +522,27 @@
         .notification-title {
             font-weight: 600;
             font-size: 14px;
-            color: #1a202c;
+            color: var(--text-primary);
             margin-bottom: 4px;
             line-height: 1.4;
         }
         
         .notification-message {
             font-size: 13px;
-            color: #64748b;
+            color: var(--text-muted);
             margin-bottom: 6px;
             line-height: 1.4;
         }
         
         .notification-time {
             font-size: 11px;
-            color: #94a3b8;
+            color: var(--text-faint);
         }
         
         .notifications-empty {
             padding: 40px 20px;
             text-align: center;
-            color: #94a3b8;
+            color: var(--text-faint);
         }
         
         .notifications-empty i {
@@ -544,21 +562,21 @@
         }
         
         .user-profile:hover {
-            background: #f7fafc;
+            background: var(--bg-input);
         }
         
         .user-profile-dropdown {
             min-width: 200px;
             border-radius: 12px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border-color);
             overflow: hidden;
         }
         
         .user-profile-dropdown .dropdown-item {
             padding: 12px 20px;
             font-size: 14px;
-            color: #1a202c;
+            color: var(--text-primary);
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -566,7 +584,7 @@
         }
         
         .user-profile-dropdown .dropdown-item:hover {
-            background: #f7fafc;
+            background: var(--bg-input);
             color: var(--primary-color);
         }
         
@@ -575,7 +593,7 @@
         }
         
         .user-profile-dropdown .dropdown-item.logout:hover {
-            background: #fee2e2;
+            background: var(--notif-danger-bg);
             color: var(--danger-color);
         }
         
@@ -583,7 +601,7 @@
             width: 36px;
             height: 36px;
             border-radius: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent-gradient);
             color: white;
             display: flex;
             align-items: center;
@@ -600,7 +618,7 @@
         .user-name {
             font-size: 14px;
             font-weight: 600;
-            color: var(--dark-color);
+            color: var(--text-primary);
         }
         
         .user-role {
@@ -620,7 +638,7 @@
         .page-title {
             font-size: 28px;
             font-weight: 700;
-            color: var(--dark-color);
+            color: var(--text-primary);
             margin-bottom: 8px;
         }
         
@@ -635,7 +653,7 @@
             border-radius: 16px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             margin-bottom: 24px;
-            background: white;
+            background: var(--bg-surface);
             transition: all 0.2s;
         }
         
@@ -644,7 +662,7 @@
         }
         
         .card-header {
-            background: white;
+            background: var(--bg-surface);
             border-bottom: 1px solid var(--border-color);
             padding: 20px 24px;
             border-radius: 16px 16px 0 0;
@@ -665,7 +683,7 @@
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent-gradient);
             color: white;
         }
         
@@ -717,13 +735,13 @@
             width: 40px;
             height: 40px;
             border-radius: 10px;
-            background: #f7fafc;
+            background: var(--bg-input);
             border: 1px solid var(--border-color);
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s;
-            color: var(--dark-color);
+            color: var(--text-primary);
             font-size: 18px;
         }
         
@@ -740,14 +758,14 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: white;
+            background: var(--header-bg);
             border-top: 1px solid var(--border-color);
             padding: 8px 0;
             z-index: 1000;
             display: none;
             justify-content: space-around;
             align-items: center;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--shadow-sm);
         }
         
         .bottom-nav-mobile-item {
@@ -766,13 +784,14 @@
             min-width: 0;
         }
         
-        .bottom-nav-mobile-item.active {
-            color: var(--primary-color);
-            background: rgba(102, 126, 234, 0.1);
-        }
-        
         .bottom-nav-mobile-item i {
             font-size: 18px;
+            color: var(--sidebar-icon);
+        }
+        
+        .bottom-nav-mobile-item.active {
+            color: var(--primary-color);
+            background: color-mix(in srgb, var(--primary-color) 12%, transparent);
         }
         
         .bottom-nav-mobile-item.active i {
@@ -793,7 +812,7 @@
         }
         
         .mobile-card-item {
-            background: white;
+            background: var(--bg-surface);
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 12px;
@@ -813,7 +832,7 @@
         .mobile-card-item-title {
             font-weight: 600;
             font-size: 15px;
-            color: var(--dark-color);
+            color: var(--text-primary);
             flex: 1;
         }
         
@@ -846,7 +865,7 @@
         
         .mobile-card-item-value {
             font-size: 13px;
-            color: var(--dark-color);
+            color: var(--text-primary);
             font-weight: 500;
         }
         
@@ -877,9 +896,9 @@
         .mobile-pagination-btn {
             padding: 8px 12px;
             border: 1px solid var(--border-color);
-            background: white;
+            background: var(--bg-surface);
             border-radius: 8px;
-            color: var(--dark-color);
+            color: var(--text-primary);
             font-size: 13px;
             cursor: pointer;
             transition: all 0.2s;
@@ -1137,7 +1156,7 @@
             .table td:first-child {
                 position: sticky;
                 left: 0;
-                background: white;
+                background: var(--bg-surface);
                 z-index: 1;
             }
             
@@ -1298,10 +1317,11 @@
             }
         }
     </style>
-    
+
     @stack('styles')
+    <link rel="stylesheet" href="{{ asset('css/theme-overrides.css') }}">
 </head>
-<body>
+<body class="@if(request()->routeIs('portal.*')) portal-page @endif @if(request()->routeIs('company.tutorial', 'portal.tutorial')) tutorial-layout-page @endif">
     <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     
@@ -1337,6 +1357,26 @@
                     </a>
                 </div>
             @else
+                @php $isClientPortal = auth()->user()->isClientUser(); @endphp
+                @if($isClientPortal)
+                <div class="menu-section">
+                    <div class="menu-section-title">Portal</div>
+                    <a href="{{ route('portal.dashboard') }}" class="sidebar-menu-item {{ request()->routeIs('portal.dashboard') ? 'active' : '' }}" data-title="Início">
+                        <i class="fas fa-home"></i>
+                        <span>Início</span>
+                    </a>
+                    <a href="{{ route('portal.tasks.create') }}" class="sidebar-menu-item {{ request()->routeIs('portal.tasks.create') ? 'active' : '' }}" data-title="Nova solicitação">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Nova solicitação</span>
+                    </a>
+                    <a href="{{ route('portal.tutorial') }}" class="sidebar-menu-item {{ request()->routeIs('portal.tutorial') ? 'active' : '' }}" data-title="Tutorial">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Tutorial</span>
+                    </a>
+                </div>
+                @else
+                @php $access = $sidebarAccess ?? null; @endphp
+                @if($access && $access['company_dashboard'])
                 <div class="menu-section">
                     <div class="menu-section-title">Overview</div>
                     <a href="{{ route('company.dashboard') }}" class="sidebar-menu-item {{ request()->routeIs('company.dashboard') ? 'active' : '' }}" data-title="Dashboard">
@@ -1344,75 +1384,145 @@
                         <span>Dashboard</span>
                     </a>
                 </div>
+                @elseif($access && $access['developer_dashboard'])
+                <div class="menu-section">
+                    <div class="menu-section-title">Overview</div>
+                    <a href="{{ route('company.developer-dashboard') }}" class="sidebar-menu-item {{ request()->routeIs('company.developer-dashboard') ? 'active' : '' }}" data-title="Meu Dashboard">
+                        <i class="fas fa-code"></i>
+                        <span>Meu Dashboard</span>
+                    </a>
+                </div>
+                @endif
                 <div class="menu-section">
                     <div class="menu-section-title">Gestão</div>
+                    @if($access && ($access['modules']['clients'] ?? false))
                     <a href="{{ route('company.clients.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.clients.*') ? 'active' : '' }}" data-title="Clientes">
                         <i class="fas fa-users"></i>
                         <span>Clientes</span>
                     </a>
+                    @endif
+                    @if($access && ($access['modules']['projects'] ?? false))
                     <a href="{{ route('company.projects.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.projects.*') ? 'active' : '' }}" data-title="Projetos">
                         <i class="fas fa-project-diagram"></i>
                         <span>Projetos</span>
                     </a>
+                    @endif
+                    @if($access && ($access['modules']['tasks'] ?? false))
+                    <a href="{{ route('company.tasks.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.tasks.*') ? 'active' : '' }}" data-title="Tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Tasks</span>
+                    </a>
+                    @endif
+                    @if($access && ($access['modules']['dailies'] ?? false))
+                    <a href="{{ route('company.dailies.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.dailies.index') ? 'active' : '' }}" data-title="Daily">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Daily</span>
+                    </a>
+                    @endif
+                    @if($access && ($access['productivity'] ?? false))
+                    <a href="{{ route('company.dailies.productivity') }}" class="sidebar-menu-item {{ request()->routeIs('company.dailies.productivity') ? 'active' : '' }}" data-title="Produtividade">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Produtividade</span>
+                    </a>
+                    @endif
+                    @if($access && ($access['modules']['leads'] ?? false))
                     <a href="{{ route('company.leads.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.leads.*') ? 'active' : '' }}" data-title="Leads">
                         <i class="fas fa-bullseye"></i>
                         <span>Leads</span>
                     </a>
+                    @endif
+                    @if($access && ($access['modules']['contracts'] ?? false))
                     <a href="{{ route('company.contracts.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.contracts.*') ? 'active' : '' }}" data-title="Contratos">
                         <i class="fas fa-file-contract"></i>
                         <span>Contratos</span>
                     </a>
+                    @endif
+                    @if($access && ($access['modules']['employees'] ?? false))
                     <a href="{{ route('company.employees.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.employees.*') ? 'active' : '' }}" data-title="Funcionários">
                         <i class="fas fa-user-tie"></i>
                         <span>Funcionários</span>
                     </a>
+                    @endif
+                    @if($access && ($access['modules']['expenses'] ?? false))
                     <a href="{{ route('company.expenses.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.expenses.*') ? 'active' : '' }}" data-title="Despesas">
                         <i class="fas fa-receipt"></i>
                         <span>Despesas</span>
                     </a>
+                    @endif
+                    @if($access && ($access['modules']['suppliers'] ?? false))
                     <a href="{{ route('company.suppliers.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.suppliers.*') ? 'active' : '' }}" data-title="Fornecedores">
                         <i class="fas fa-truck"></i>
                         <span>Fornecedores</span>
                     </a>
+                    @endif
                 </div>
+                @if($access && (($access['modules']['receivables'] ?? false) || ($access['modules']['payables'] ?? false)))
                 <div class="menu-section">
                     <div class="menu-section-title">Financeiro</div>
+                    @if($access['modules']['receivables'] ?? false)
                     <a href="{{ route('company.receivables.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.receivables.*') ? 'active' : '' }}" data-title="Contas a Receber">
                         <i class="fas fa-arrow-circle-down"></i>
                         <span>Contas a Receber</span>
                     </a>
+                    @endif
+                    @if($access['modules']['payables'] ?? false)
                     <a href="{{ route('company.payables.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.payables.*') ? 'active' : '' }}" data-title="Contas a Pagar">
                         <i class="fas fa-arrow-circle-up"></i>
                         <span>Contas a Pagar</span>
                     </a>
+                    @endif
                 </div>
+                @endif
+                @if($access && (($access['modules']['accounting_entry'] ?? false) || ($access['modules']['accounting_exit'] ?? false) || ($access['modules']['accounting_report'] ?? false)))
                 <div class="menu-section">
                     <div class="menu-section-title">Contabilidade</div>
+                    @if($access['modules']['accounting_entry'] ?? false)
                     <a href="{{ route('company.accounting.fiscal-entry-notes.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.accounting.fiscal-entry-notes.*') && !request()->routeIs('company.accounting.fiscal-entry-notes.report') ? 'active' : '' }}" data-title="NF entrada">
                         <i class="fas fa-file-invoice"></i>
                         <span>Notas fiscais de entrada</span>
                     </a>
+                    @endif
+                    @if($access['modules']['accounting_exit'] ?? false)
                     <a href="{{ route('company.accounting.fiscal-exit-notes.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.accounting.fiscal-exit-notes.*') ? 'active' : '' }}" data-title="NF saída">
                         <i class="fas fa-file-export"></i>
                         <span>Notas fiscais de saída</span>
                     </a>
+                    @endif
+                    @if($access['modules']['accounting_report'] ?? false)
                     <a href="{{ route('company.accounting.report') }}" class="sidebar-menu-item {{ request()->routeIs('company.accounting.report') || request()->routeIs('company.accounting.fiscal-entry-notes.report') ? 'active' : '' }}" data-title="Relatório fiscal">
                         <i class="fas fa-file-alt"></i>
                         <span>Relatório fiscal</span>
                     </a>
+                    @endif
                 </div>
+                @endif
+                @endif
             @endif
+            @if(!auth()->user()->isClientUser())
+            @php $access = $sidebarAccess ?? ($access ?? null); @endphp
+            <div class="menu-section">
+                <div class="menu-section-title">Ajuda</div>
+                <a href="{{ route('company.tutorial') }}" class="sidebar-menu-item {{ request()->routeIs('company.tutorial') ? 'active' : '' }}" data-title="Tutorial">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Tutorial</span>
+                </a>
+            </div>
             <div class="menu-section" style="margin-top: auto; padding-top: 24px; border-top: 1px solid var(--border-color);">
                 <div class="menu-section-title">Configurações</div>
+                @if($access && ($access['manage_profiles'] ?? false))
+                <a href="{{ route('company.permission-profiles.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.permission-profiles.*') ? 'active' : '' }}" data-title="Permissões">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Permissões</span>
+                </a>
+                @endif
+                @if($access && ($access['modules']['expense_categories'] ?? false))
                 <a href="{{ route('company.expense-categories.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.expense-categories.*') ? 'active' : '' }}" data-title="Categorias de Despesas">
                     <i class="fas fa-tags"></i>
                     <span>Categorias de Despesas</span>
                 </a>
-                <a href="#" class="sidebar-menu-item" data-title="Ajuda & Suporte">
-                    <i class="fas fa-question-circle"></i>
-                    <span>Ajuda & Suporte</span>
-                </a>
+                @endif
             </div>
+            @endif
         </nav>
     </aside>
     
@@ -1433,6 +1543,9 @@
                 </div>
             </div>
             <div class="header-right">
+                <button type="button" class="theme-toggle-btn" id="themeToggle" aria-label="Alternar tema" title="Alternar tema claro/escuro">
+                    <i class="fas fa-moon" id="themeToggleIcon" data-theme-icon></i>
+                </button>
                 <div class="dropdown">
                     <div class="user-profile" id="userProfileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="user-avatar">
@@ -1440,7 +1553,15 @@
                     </div>
                     <div class="user-info">
                         <div class="user-name">{{ Auth::user()->name }}</div>
-                        <div class="user-role">{{ Auth::user()->is_super_admin ? 'Super Admin' : 'Usuário' }}</div>
+                        <div class="user-role">
+                            @if(Auth::user()->is_super_admin)
+                                Super Admin
+                            @elseif(auth()->user()->isClientUser())
+                                Cliente
+                            @else
+                                {{ ucfirst(auth()->user()->companyRole() ?? 'Usuário') }}
+                            @endif
+                        </div>
                     </div>
                     </div>
                     <ul class="dropdown-menu dropdown-menu-end user-profile-dropdown" aria-labelledby="userProfileDropdown">
@@ -1460,6 +1581,7 @@
         
         <!-- Content -->
         <div class="content-wrapper">
+            @include('components.loading-overlay')
             @yield('content')
         </div>
     </div>
@@ -1490,7 +1612,12 @@
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ asset('js/app-loading.js') }}"></script>
+    <script src="{{ asset('js/theme.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+        AppTheme.initThemeToggle('#themeToggle');
+
         // Detecta mobile e redireciona se necessário
         (function() {
             if (window.innerWidth <= 992 && !window.location.search.includes('desktop=1')) {

@@ -55,12 +55,15 @@ class UserController extends Controller
             $userData['status'] = $validated['status'] ?? 'active';
         }
         
-        // Adiciona is_super_admin apenas se a coluna existir
+        $isSuperAdmin = null;
         if (Schema::hasColumn('users', 'is_super_admin')) {
-            $userData['is_super_admin'] = $validated['is_super_admin'] ?? false;
+            $isSuperAdmin = (bool) ($validated['is_super_admin'] ?? false);
         }
 
-        User::create($userData);
+        $user = User::create($userData);
+        if ($isSuperAdmin !== null) {
+            $user->forceFill(['is_super_admin' => $isSuperAdmin])->save();
+        }
 
         return redirect()->route('admin.users.index')
             ->with('success', 'Usuário criado com sucesso!');
@@ -110,12 +113,16 @@ class UserController extends Controller
             $updateData['status'] = $validated['status'];
         }
         
-        // Adiciona is_super_admin apenas se a coluna existir
+        $isSuperAdmin = null;
         if (Schema::hasColumn('users', 'is_super_admin') && isset($validated['is_super_admin'])) {
-            $updateData['is_super_admin'] = $validated['is_super_admin'];
+            $isSuperAdmin = (bool) $validated['is_super_admin'];
+            unset($updateData['is_super_admin']);
         }
 
         $user->update($updateData);
+        if ($isSuperAdmin !== null) {
+            $user->forceFill(['is_super_admin' => $isSuperAdmin])->save();
+        }
 
         return redirect()->route('admin.users.index')
             ->with('success', 'Usuário atualizado com sucesso!');

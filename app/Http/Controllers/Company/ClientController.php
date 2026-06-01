@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Exports\ClientsExport;
 use App\Models\Client;
@@ -11,10 +12,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
 use Dompdf\Dompdf;
-use Dompdf\Options;
+use App\Services\CompanyUserProvisioningService;
 
 class ClientController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     /**
      * Obtém a empresa atual do contexto
      */
@@ -75,8 +78,9 @@ class ClientController extends Controller
         }
         
         // Ordenação
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $allowedSorts = ['name', 'email', 'created_at', 'status', 'city', 'type'];
+        $sortBy = in_array($request->get('sort_by'), $allowedSorts, true) ? $request->get('sort_by') : 'created_at';
+        $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
         
         // Paginação
@@ -203,6 +207,7 @@ class ClientController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
@@ -375,9 +380,12 @@ class ClientController extends Controller
             'overdue_value' => $overdueValue,
         ];
         
+        $access = app(CompanyUserProvisioningService::class)->clientAccess($company, $client);
+
         return view('company.clients.show', compact(
             'client',
             'company',
+            'access',
             'activeContracts',
             'projects',
             'receivables',
@@ -398,10 +406,13 @@ class ClientController extends Controller
      */
     public function edit(Client $client)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($client, $company);
         
-        return view('company.clients.edit', compact('client', 'company'));
+        $access = app(CompanyUserProvisioningService::class)->clientAccess($company, $client);
+
+        return view('company.clients.edit', compact('client', 'company', 'access'));
     }
 
     /**
@@ -409,6 +420,7 @@ class ClientController extends Controller
      */
     public function update(Request $request, Client $client)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($client, $company);
         
@@ -439,6 +451,7 @@ class ClientController extends Controller
      */
     public function destroy(Client $client)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($client, $company);
         

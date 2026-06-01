@@ -482,6 +482,7 @@ class DashboardController extends Controller
     public function updateCash(Request $request)
     {
         $company = $this->getCurrentCompany();
+        abort_unless(app(\App\Services\CompanyAuthorizationService::class)->canManage(), 403, 'Sem permissão para alterar o saldo de caixa.');
 
         $validated = $request->validate([
             'current_cash_balance' => ['required', 'numeric', 'min:0'],

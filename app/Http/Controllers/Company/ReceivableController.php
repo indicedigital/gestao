@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Project;
 use App\Models\Receivable;
+use App\Rules\BelongsToCompany;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReceivableController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -109,6 +113,7 @@ class ReceivableController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $clients = Client::where('company_id', $company->id)->where('status', 'active')->get();
         $projects = Project::where('company_id', $company->id)->get();
@@ -122,12 +127,13 @@ class ReceivableController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'project_id' => 'nullable|exists:projects,id',
-            'contract_id' => 'nullable|exists:contracts,id',
+            'client_id' => ['required', new BelongsToCompany('clients', $company->id)],
+            'project_id' => ['nullable', new BelongsToCompany('projects', $company->id)],
+            'contract_id' => ['nullable', new BelongsToCompany('contracts', $company->id)],
             'type' => 'required|in:project,recurring,other',
             'description' => 'required|string|max:255',
             'value' => 'required|numeric|min:0',
@@ -158,6 +164,7 @@ class ReceivableController extends Controller
 
     public function edit(Receivable $receivable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
         
@@ -174,6 +181,7 @@ class ReceivableController extends Controller
 
     public function update(Request $request, Receivable $receivable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
 
@@ -184,9 +192,9 @@ class ReceivableController extends Controller
 
         try {
             $validated = $request->validate([
-                'client_id' => 'required|exists:clients,id',
-                'project_id' => 'nullable|exists:projects,id',
-                'contract_id' => 'nullable|exists:contracts,id',
+                'client_id' => ['required', new BelongsToCompany('clients', $company->id)],
+                'project_id' => ['nullable', new BelongsToCompany('projects', $company->id)],
+                'contract_id' => ['nullable', new BelongsToCompany('contracts', $company->id)],
                 'type' => 'required|in:project,recurring,other',
                 'description' => 'required|string|max:255',
                 'value' => 'required|numeric|min:0',
@@ -212,6 +220,7 @@ class ReceivableController extends Controller
 
     public function destroy(Receivable $receivable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
         
@@ -223,6 +232,7 @@ class ReceivableController extends Controller
 
     public function markAsPaid(Request $request, Receivable $receivable)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($receivable, $company);
         

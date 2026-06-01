@@ -63,13 +63,18 @@ class Company extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
+    public function permissionProfiles()
+    {
+        return $this->hasMany(CompanyPermissionProfile::class);
+    }
+
     /**
      * Usuários da empresa
      */
     public function users()
     {
         return $this->belongsToMany(User::class, 'user_company')
-            ->withPivot('role', 'is_active', 'joined_at')
+            ->withPivot('role', 'is_active', 'joined_at', 'client_id', 'employee_id', 'permission_profile_id')
             ->withTimestamps();
     }
 

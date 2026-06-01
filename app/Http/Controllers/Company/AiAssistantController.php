@@ -48,6 +48,7 @@ class AiAssistantController extends Controller
     public function chat(Request $request): JsonResponse
     {
         $company = $this->getCurrentCompany();
+        $authz = app(\App\Services\CompanyAuthorizationService::class);
 
         $validated = $request->validate([
             'theme' => ['required', 'in:clientes,contratos,financeiro,contabil,fluxo_caixa,despesas'],
@@ -56,6 +57,8 @@ class AiAssistantController extends Controller
             'history.*.role' => ['required_with:history', 'in:user,assistant,model'],
             'history.*.text' => ['required_with:history', 'string', 'max:4000'],
         ]);
+
+        abort_unless($this->canAccessAiTheme($authz, $validated['theme']), 403, 'Sem permissão para consultar este tema.');
 
         $apiKey = (string) config('services.gemini.api_key', '');
         if ($apiKey === '') {
@@ -624,6 +627,19 @@ PROMPT;
             ->implode("\n");
 
         return trim($text);
+    }
+
+    protected function canAccessAiTheme(\App\Services\CompanyAuthorizationService $authz, string $theme): bool
+    {
+        return match ($theme) {
+            'clientes' => $authz->canAccessModule('clients'),
+            'contratos' => $authz->canAccessModule('contracts'),
+            'financeiro' => $authz->canAccessModule('receivables') && $authz->canAccessModule('payables'),
+            'contabil' => $authz->canAccessModule('accounting_entry') || $authz->canAccessModule('accounting_exit'),
+            'fluxo_caixa' => $authz->canViewCompanyDashboard(),
+            'despesas' => $authz->canAccessModule('expenses'),
+            default => false,
+        };
     }
 }
 

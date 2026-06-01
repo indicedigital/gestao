@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Http\Controllers\Company\Concerns\AuthorizesCompanyManagement;
 use App\Http\Controllers\Controller;
+use App\Rules\BelongsToCompany;
 use App\Services\ContractInstallmentService;
 use App\Services\RecurringContractService;
+use App\Services\SlaService;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Contract;
@@ -12,9 +15,12 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class ContractController extends Controller
 {
+    use AuthorizesCompanyManagement;
+
     protected function getCurrentCompany(): Company
     {
         $user = Auth::user();
@@ -58,6 +64,7 @@ class ContractController extends Controller
 
     public function create()
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $clients = Client::where('company_id', $company->id)->where('status', 'active')->get();
         $employees = Employee::where('company_id', $company->id)->where('status', 'active')->get();
@@ -67,13 +74,14 @@ class ContractController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         
         $validated = $request->validate([
             'type' => 'required|in:client_recurring,client_fixed,employee_clt,employee_pj',
-            'client_id' => 'required_if:type,client_recurring,client_fixed|nullable|exists:clients,id',
-            'employee_id' => 'required_if:type,employee_clt,employee_pj|nullable|exists:employees,id',
-            'number' => 'nullable|string|max:100|unique:contracts,number',
+            'client_id' => ['required_if:type,client_recurring,client_fixed', 'nullable', new BelongsToCompany('clients', $company->id)],
+            'employee_id' => ['required_if:type,employee_clt,employee_pj', 'nullable', new BelongsToCompany('employees', $company->id)],
+            'number' => ['nullable', 'string', 'max:100', Rule::unique('contracts', 'number')->where('company_id', $company->id)],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'value' => 'required|numeric|min:0',
@@ -204,10 +212,11 @@ class ContractController extends Controller
 
     public function edit(Contract $contract)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($contract, $company);
 
-        $contract->load(['installments', 'receivables' => function ($q) {
+        $contract->load(['installments', 'slaSettings', 'receivables' => function ($q) {
             $q->orderBy('due_date')->orderBy('installment_number');
         }]);
         if (Schema::hasTable('receivable_payments')) {
@@ -222,14 +231,15 @@ class ContractController extends Controller
 
     public function update(Request $request, Contract $contract)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($contract, $company);
         
         $validated = $request->validate([
             'type' => 'required|in:client_recurring,client_fixed,employee_clt,employee_pj',
-            'client_id' => 'required_if:type,client_recurring,client_fixed|nullable|exists:clients,id',
-            'employee_id' => 'required_if:type,employee_clt,employee_pj|nullable|exists:employees,id',
-            'number' => 'nullable|string|max:100|unique:contracts,number,' . $contract->id,
+            'client_id' => ['required_if:type,client_recurring,client_fixed', 'nullable', new BelongsToCompany('clients', $company->id)],
+            'employee_id' => ['required_if:type,employee_clt,employee_pj', 'nullable', new BelongsToCompany('employees', $company->id)],
+            'number' => ['nullable', 'string', 'max:100', Rule::unique('contracts', 'number')->where('company_id', $company->id)->ignore($contract->id)],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'value' => 'required|numeric|min:0',
@@ -263,6 +273,28 @@ class ContractController extends Controller
         }
 
         $contract->update($validated);
+
+        if ($request->has('sla_hours')) {
+            $slaRules = [];
+            foreach (array_keys(\App\Models\Task::PRIORITIES) as $priority) {
+                $slaRules["sla_hours.{$priority}"] = 'nullable|integer|min:1|max:8760';
+            }
+            $request->validate($slaRules);
+
+            foreach ($request->input('sla_hours', []) as $priority => $hours) {
+                if (! array_key_exists($priority, \App\Models\Task::PRIORITIES)) {
+                    continue;
+                }
+                if ($hours !== null && $hours !== '') {
+                    $contract->slaSettings()->updateOrCreate(
+                        ['priority' => $priority],
+                        ['hours' => (int) $hours]
+                    );
+                }
+            }
+        } elseif ($contract->slaSettings()->count() === 0 && in_array($contract->type, ['client_recurring', 'client_fixed'], true)) {
+            (new SlaService())->seedDefaultsForContract($contract);
+        }
         
         // Regenera contas a receber se for contrato recorrente
         if ($contract->type === 'client_recurring' && $contract->billing_period === 'monthly') {
@@ -292,6 +324,7 @@ class ContractController extends Controller
 
     public function destroy(Contract $contract)
     {
+        $this->authorizeManage();
         $company = $this->getCurrentCompany();
         $this->authorizeAccess($contract, $company);
         

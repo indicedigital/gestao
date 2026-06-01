@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+        (function () {
+            var t = localStorage.getItem('app-theme');
+            if (!t && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+            }
+        })();
+    </script>
     <title>Login - Índice</title>
     
     <!-- Bootstrap CSS -->
@@ -12,6 +25,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
     
     <style>
         * {
@@ -34,7 +48,7 @@
         /* Left Panel - Illustration */
         .login-left {
             flex: 1;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+            background: linear-gradient(135deg, var(--bg-surface-2) 0%, var(--bg-surface-3) 100%);
             position: relative;
             overflow: hidden;
             display: flex;
@@ -62,14 +76,14 @@
         .login-title-left {
             font-size: 42px;
             font-weight: 700;
-            color: #1a202c;
+            color: var(--text-primary);
             margin-bottom: 20px;
             line-height: 1.2;
         }
         
         .login-subtitle-left {
             font-size: 18px;
-            color: #64748b;
+            color: var(--text-muted);
             line-height: 1.6;
         }
         
@@ -88,7 +102,7 @@
         /* Right Panel - Login Form */
         .login-right {
             flex: 1;
-            background: #ffffff;
+            background: var(--bg-surface);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -104,7 +118,7 @@
         .login-title {
             font-size: 32px;
             font-weight: 700;
-            color: #1a202c;
+            color: var(--text-primary);
             margin-bottom: 40px;
         }
         
@@ -116,7 +130,7 @@
         .form-label {
             font-size: 14px;
             font-weight: 600;
-            color: #1a202c;
+            color: var(--text-primary);
             margin-bottom: 8px;
             display: block;
         }
@@ -128,11 +142,11 @@
         .form-control-modern {
             width: 100%;
             padding: 14px 48px 14px 16px;
-            border: 2px solid #e2e8f0;
+            border: 2px solid var(--border-color);
             border-radius: 12px;
             font-size: 15px;
-            color: #1a202c;
-            background: #ffffff;
+            color: var(--text-primary);
+            background: var(--bg-input);
             transition: all 0.2s;
         }
         
@@ -354,8 +368,13 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/theme-overrides.css') }}">
 </head>
 <body>
+    <button type="button" class="theme-toggle-btn" id="themeToggle" aria-label="Alternar tema" title="Alternar tema claro/escuro"
+            style="position:fixed;top:16px;right:16px;z-index:1000;">
+        <i class="fas fa-moon" data-theme-icon></i>
+    </button>
     <div class="login-container">
         <!-- Left Panel -->
         <div class="login-left">
@@ -437,7 +456,9 @@
         </div>
     </div>
     
+    <script src="{{ asset('js/theme.js') }}"></script>
     <script>
+        AppTheme.initThemeToggle('#themeToggle');
         // Toggle password visibility
         document.getElementById('togglePassword').addEventListener('click', function() {
             const passwordInput = document.getElementById('password');

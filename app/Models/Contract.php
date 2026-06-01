@@ -99,6 +99,14 @@ class Contract extends Model
     }
 
     /**
+     * Configurações de SLA por prioridade
+     */
+    public function slaSettings()
+    {
+        return $this->hasMany(ContractSlaSetting::class);
+    }
+
+    /**
      * Parcelas pendentes
      */
     public function pendingInstallments()

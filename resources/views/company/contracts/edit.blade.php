@@ -162,6 +162,31 @@
                     @enderror
                 </div>
 
+                @if(in_array($contract->type, ['client_recurring', 'client_fixed']))
+                <div class="card bg-light mb-3">
+                    <div class="card-body">
+                        <h6 class="mb-3"><i class="fas fa-clock me-1"></i> SLA por Prioridade (Tasks)</h6>
+                        <p class="small text-muted">Define o prazo em horas para tasks vinculadas a projetos deste contrato.</p>
+                        <div class="row">
+                            @php
+                                $slaMap = $contract->slaSettings->keyBy('priority');
+                                $defaults = \App\Models\Task::DEFAULT_SLA_HOURS;
+                            @endphp
+                            @foreach(\App\Models\Task::PRIORITIES as $priority => $label)
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label small">{{ $priority }}</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" name="sla_hours[{{ $priority }}]" class="form-control"
+                                               value="{{ old('sla_hours.'.$priority, $slaMap[$priority]->hours ?? $defaults[$priority] ?? 24) }}" min="1">
+                                        <span class="input-group-text">h</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 <div class="d-flex justify-content-end gap-2">
                     <a href="{{ route('company.contracts.index') }}" class="btn btn-secondary">Cancelar</a>
                     <button type="submit" class="btn btn-primary">Atualizar Contrato</button>

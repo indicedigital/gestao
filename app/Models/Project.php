@@ -9,6 +9,25 @@ class Project extends Model
 {
     use SoftDeletes;
 
+    public const CATEGORIES = [
+        'suporte' => 'Suporte',
+        'desenvolvimento' => 'Desenvolvimento',
+        'melhorias' => 'Melhorias',
+        'implantacao' => 'Implantação',
+        'consultoria' => 'Consultoria',
+    ];
+
+    public const STATUSES = [
+        'active' => 'Ativo',
+        'paused' => 'Pausado',
+        'implementing' => 'Em Implantação',
+        'completed' => 'Concluído',
+        'cancelled' => 'Cancelado',
+        // legado
+        'planning' => 'Em Implantação',
+        'in_progress' => 'Ativo',
+    ];
+
     protected $fillable = [
         'company_id',
         'client_id',
@@ -16,6 +35,7 @@ class Project extends Model
         'name',
         'description',
         'type',
+        'category',
         'total_value',
         'installments',
         'status',
@@ -87,6 +107,32 @@ class Project extends Model
     public function receivables()
     {
         return $this->hasMany(Receivable::class);
+    }
+
+    /**
+     * Tasks do projeto
+     */
+    public function tasks()
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Dailies vinculadas ao projeto
+     */
+    public function dailies()
+    {
+        return $this->hasMany(Daily::class);
+    }
+
+    public function statusLabel(): string
+    {
+        return self::STATUSES[$this->status] ?? ucfirst((string) $this->status);
+    }
+
+    public function categoryLabel(): string
+    {
+        return self::CATEGORIES[$this->category] ?? ucfirst((string) $this->category);
     }
 
     /**

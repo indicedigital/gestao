@@ -49,9 +49,19 @@ class LoginController extends Controller
         // Verifica se tem empresa vinculada
         $company = $user->currentCompany();
         if ($company) {
-            // Salva a empresa na sessão para contexto de tenant
             session(['current_company_id' => $company->id]);
-            return redirect()->route('company.dashboard');
+
+            if ($user->isClientUser($company->id)) {
+                return redirect()->route('portal.dashboard');
+            }
+
+            $authz = app(\App\Services\CompanyAuthorizationService::class);
+            $firstRoute = $authz->firstAccessibleRouteName();
+            if ($firstRoute) {
+                return redirect()->route($firstRoute);
+            }
+
+            return redirect()->route('company.projects.index');
         }
 
         // Se não tem empresa, redireciona para dashboard genérico (pode mostrar mensagem)

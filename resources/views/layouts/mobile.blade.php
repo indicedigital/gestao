@@ -14,6 +14,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+        (function () {
+            var t = localStorage.getItem('app-theme');
+            if (!t && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+            }
+        })();
+    </script>
     <title>@yield('title', 'Dashboard') - Índice</title>
     <link rel="icon" type="image/png" href="{{ $companyFaviconUrl ?: asset('favicon.ico') }}">
     <link rel="shortcut icon" href="{{ $companyFaviconUrl ?: asset('favicon.ico') }}">
@@ -26,6 +39,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
     
     <style>
         * {
@@ -35,20 +49,16 @@
         }
         
         :root {
-            --primary-color: #667eea;
-            --primary-dark: #764ba2;
-            --success-color: #2dce89;
-            --danger-color: #f5365c;
-            --text-muted: #64748b;
-            --dark-color: #1a202c;
-            --border-color: #e2e8f0;
-            --bg-color: #f7fafc;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+            --dark-color: var(--text-primary);
+            --bg-color: var(--bg-body);
         }
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--bg-color);
-            color: var(--dark-color);
+            background: var(--bg-body);
+            color: var(--text-primary);
             font-size: 14px;
             line-height: 1.6;
             padding-bottom: 80px;
@@ -81,7 +91,7 @@
             left: 0;
             width: 280px;
             height: 100vh;
-            background: #ffffff;
+            background: var(--bg-surface);
             border-right: 1px solid var(--border-color);
             overflow-y: auto;
             z-index: 999;
@@ -149,7 +159,7 @@
         
         .sidebar-menu-item {
             padding: 12px 20px;
-            color: #4a5568;
+            color: var(--sidebar-text);
             text-decoration: none;
             display: flex;
             align-items: center;
@@ -162,13 +172,13 @@
         }
         
         .sidebar-menu-item:hover {
-            background-color: var(--bg-color);
-            color: var(--dark-color);
+            background-color: var(--sidebar-hover-bg);
+            color: var(--text-primary);
         }
         
         .sidebar-menu-item.active {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            color: white;
+            background: var(--sidebar-active-bg);
+            color: var(--sidebar-active-text);
         }
         
         .sidebar-menu-item i {
@@ -178,7 +188,7 @@
         
         /* Header Mobile */
         .mobile-header {
-            background: white;
+            background: var(--bg-surface);
             padding: 16px 20px;
             display: flex;
             justify-content: space-between;
@@ -187,6 +197,12 @@
             position: sticky;
             top: 0;
             z-index: 100;
+        }
+        
+        .mobile-header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .mobile-header-left {
@@ -221,7 +237,7 @@
         
         /* Cards */
         .mobile-card {
-            background: white;
+            background: var(--bg-surface);
             border-radius: 16px;
             padding: 20px;
             margin-bottom: 16px;
@@ -234,7 +250,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: white;
+            background: var(--bg-surface);
             border-top: 1px solid var(--border-color);
             padding: 8px 0;
             z-index: 1000;
@@ -319,7 +335,7 @@
         
         /* Income/Expense Cards */
         .summary-card {
-            background: white;
+            background: var(--bg-surface);
             border-radius: 16px;
             padding: 16px;
             display: flex;
@@ -510,7 +526,7 @@
         }
         
         .mobile-card-item {
-            background: white;
+            background: var(--bg-surface);
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 12px;
@@ -594,7 +610,7 @@
         .mobile-pagination-btn {
             padding: 8px 12px;
             border: 1px solid var(--border-color);
-            background: white;
+            background: var(--bg-surface);
             border-radius: 8px;
             color: var(--dark-color);
             font-size: 13px;
@@ -659,6 +675,7 @@
     </style>
     
     @stack('styles')
+    <link rel="stylesheet" href="{{ asset('css/theme-overrides.css') }}">
 </head>
 <body>
     <!-- Sidebar Overlay -->
@@ -757,8 +774,13 @@
             </div>
             <h1 class="mobile-header-title">@yield('title', 'Dashboard')</h1>
         </div>
-        <div class="mobile-header-icon">
-            <i class="fas fa-bell"></i>
+        <div class="mobile-header-right">
+            <div class="mobile-header-icon theme-toggle-btn" id="themeToggle" aria-label="Alternar tema" title="Alternar tema">
+                <i class="fas fa-moon" data-theme-icon></i>
+            </div>
+            <div class="mobile-header-icon">
+                <i class="fas fa-bell"></i>
+            </div>
         </div>
     </header>
     
@@ -793,7 +815,9 @@
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ asset('js/theme.js') }}"></script>
     <script>
+        AppTheme.initThemeToggle('#themeToggle');
         // Set mobile cookie
         if (window.innerWidth <= 992) {
             document.cookie = 'is_mobile=1; path=/; max-age=86400';
