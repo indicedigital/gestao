@@ -14,6 +14,8 @@
 
     window.AppLoading = {
         show(message) {
+            clearTimeout(navTimer);
+            navTimer = null;
             const el = overlay();
             if (!el) return;
             loadingCount++;
@@ -28,6 +30,8 @@
             }
         },
         hide() {
+            clearTimeout(navTimer);
+            navTimer = null;
             const el = overlay();
             if (!el) return;
             loadingCount = Math.max(0, loadingCount - 1);
@@ -45,6 +49,8 @@
             }
         },
         forceHide() {
+            clearTimeout(navTimer);
+            navTimer = null;
             loadingCount = 0;
             const el = overlay();
             if (el) {
@@ -62,6 +68,7 @@
     function shouldShowNavLoading(anchor) {
         if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return false;
         if (anchor.dataset.noLoading !== undefined) return false;
+        if (anchor.classList.contains('project-tab-link')) return false;
         const href = anchor.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
         try {

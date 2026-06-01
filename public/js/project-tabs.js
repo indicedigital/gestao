@@ -10,6 +10,8 @@
 
     const AppLoading = window.AppLoading || { show: () => {}, hide: () => {}, forceHide: () => {} };
 
+    let loadSeq = 0;
+
     function runScripts(container) {
         container.querySelectorAll('script').forEach(function (oldScript) {
             const script = document.createElement('script');
@@ -48,6 +50,7 @@
         options = options || {};
         const pushState = options.pushState !== false;
         const tab = options.tab || tabFromUrl(new URL(url, window.location.origin).pathname);
+        const seq = ++loadSeq;
 
         const panel = document.querySelector(PANEL_SEL);
         if (!panel) {
@@ -55,6 +58,7 @@
             return;
         }
 
+        AppLoading.forceHide();
         AppLoading.show(options.message || 'Carregando...');
         panel.classList.add('is-loading');
 
@@ -68,9 +72,14 @@
                 credentials: 'same-origin',
             });
 
+            if (seq !== loadSeq) return;
+
             if (!res.ok) throw new Error('HTTP ' + res.status);
 
             const html = await res.text();
+
+            if (seq !== loadSeq) return;
+
             panel.innerHTML = html;
             runScripts(panel);
             initTabPanel();
@@ -84,11 +93,14 @@
 
             panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch (err) {
+            if (seq !== loadSeq) return;
             console.error('Project tab load failed:', err);
             window.location.href = url;
         } finally {
-            panel.classList.remove('is-loading');
-            AppLoading.hide();
+            if (seq === loadSeq) {
+                panel.classList.remove('is-loading');
+                AppLoading.forceHide();
+            }
         }
     }
 

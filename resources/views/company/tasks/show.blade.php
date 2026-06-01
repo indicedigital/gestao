@@ -164,7 +164,12 @@
                 @foreach($task->comments->sortByDesc('created_at') as $comment)
                     <div class="task-activity-item">
                         <div class="task-activity-user">{{ $comment->user->name ?? 'Usuário' }}</div>
-                        <div class="task-activity-time">{{ $comment->created_at->format('d/m/Y H:i') }} — comentário@if($comment->is_internal) <span class="badge bg-secondary">Interno</span>@endif</div>
+                        <div class="task-activity-time">
+                            {{ $comment->created_at->format('d/m/Y H:i') }} — comentário
+                            @if($comment->is_internal)
+                                <span class="badge bg-secondary">Interno</span>
+                            @endif
+                        </div>
                         <div class="task-activity-text">{!! nl2br(e($comment->body)) !!}</div>
                         @if(!empty($comment->mentions))
                             <div class="small text-primary mt-1"><i class="fas fa-at"></i> {{ collect($comment->mentions)->pluck('name')->implode(', ') }}</div>
