@@ -37,6 +37,13 @@
                     </span>
                 </dd>
 
+                <dt class="col-sm-3">Setor:</dt>
+                <dd class="col-sm-9">
+                    <span class="badge bg-{{ ($employee->sector ?? 'tecnico') === 'tecnico' ? 'success' : 'warning' }}">
+                        {{ \App\Models\Employee::sectorLabels()[$employee->sector ?? 'tecnico'] ?? ucfirst($employee->sector ?? 'tecnico') }}
+                    </span>
+                </dd>
+
                 <dt class="col-sm-3">E-mail:</dt>
                 <dd class="col-sm-9">{{ $employee->email ?? '-' }}</dd>
 

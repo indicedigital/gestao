@@ -36,6 +36,10 @@
     --highlight-bg: linear-gradient(135deg, #eef2ff 0%, #e0f2fe 100%);
     --highlight-border: #c7d2fe;
     --table-danger-bg: #fff5f5;
+    --table-danger-hover: #fee8e8;
+    --table-danger-text: #742a2a;
+    --table-danger-muted: #9b2c2c;
+    --table-danger-accent: #c53030;
     --link-color: #5e72e4;
     --link-hover: #4c63d2;
     --bg-color: #f7fafc;
@@ -97,7 +101,11 @@
     --notif-info-bg: rgba(77, 212, 247, 0.15);
     --highlight-bg: linear-gradient(135deg, rgba(124, 108, 240, 0.12) 0%, rgba(77, 212, 247, 0.08) 100%);
     --highlight-border: rgba(124, 108, 240, 0.35);
-    --table-danger-bg: rgba(255, 107, 138, 0.08);
+    --table-danger-bg: rgba(255, 107, 138, 0.14);
+    --table-danger-hover: rgba(255, 107, 138, 0.22);
+    --table-danger-text: #ffd6de;
+    --table-danger-muted: #ffb3c1;
+    --table-danger-accent: #ff8fa8;
     --link-color: #9d8df7;
     --link-hover: #b4a7ff;
     --bg-color: #0f1117;
@@ -570,6 +578,72 @@ hr { border-color: var(--border-color); opacity: 1; }
     color: var(--text-secondary);
 }
 .table-bordered { border-color: var(--border-color) !important; }
+
+/* Linhas atrasadas / table-danger — cores legíveis em light e dark */
+.table-danger {
+    --bs-table-color-type: var(--table-danger-text);
+    --bs-table-bg-type: var(--table-danger-bg);
+    --bs-table-color: var(--table-danger-text);
+    --bs-table-bg: var(--table-danger-bg);
+    --bs-table-hover-color: var(--table-danger-text);
+    --bs-table-hover-bg: var(--table-danger-hover);
+    --bs-table-active-color: var(--table-danger-text);
+    --bs-table-active-bg: var(--table-danger-hover);
+    --bs-table-striped-color: var(--table-danger-text);
+    --bs-table-striped-bg: var(--table-danger-bg);
+}
+
+.table > tbody > tr.table-danger > *,
+.table > tbody > tr.table-danger > td,
+.table > tbody > tr.table-danger > th,
+.table-danger > td,
+.table-danger > th {
+    color: var(--table-danger-text) !important;
+    background-color: var(--table-danger-bg) !important;
+    box-shadow: inset 0 0 0 9999px var(--table-danger-bg) !important;
+    border-color: color-mix(in srgb, var(--color-danger) 22%, var(--border-color)) !important;
+}
+
+.table-hover > tbody > tr.table-danger:hover > * {
+    color: var(--table-danger-text) !important;
+    background-color: var(--table-danger-hover) !important;
+    box-shadow: inset 0 0 0 9999px var(--table-danger-hover) !important;
+}
+
+tr.table-danger td.text-muted,
+tr.table-danger .text-muted {
+    color: var(--table-danger-muted) !important;
+}
+
+tr.table-danger strong,
+tr.table-danger td strong {
+    color: var(--table-danger-text) !important;
+}
+
+tr.table-danger .text-danger {
+    color: var(--table-danger-accent) !important;
+}
+
+tr.table-danger .badge.bg-light,
+tr.table-danger .badge.bg-light.text-dark {
+    background: color-mix(in srgb, var(--bg-surface-3) 65%, var(--table-danger-bg)) !important;
+    color: var(--table-danger-text) !important;
+    border-color: color-mix(in srgb, var(--color-danger) 30%, var(--border-color)) !important;
+}
+
+tr.table-danger a:not(.btn) {
+    color: var(--table-danger-accent) !important;
+}
+
+tr.table-danger a:not(.btn):hover {
+    color: var(--link-hover) !important;
+}
+
+.table-overdue,
+.table-overdue > tbody > tr > td,
+.table-overdue > tbody > tr > th {
+    color: var(--table-danger-text);
+}
 
 .offcanvas {
     background: var(--bg-surface) !important;

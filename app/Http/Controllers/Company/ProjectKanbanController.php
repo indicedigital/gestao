@@ -76,7 +76,14 @@ class ProjectKanbanController extends Controller
 
         $project->load(['client:id,name', 'contract:id,name']);
 
-        $stats = Task::where('project_id', $project->id)
+        $technicalIds = Employee::where('company_id', $company->id)
+            ->forOperationalMetrics()
+            ->pluck('id');
+
+        $metricsTasks = Task::where('project_id', $project->id)
+            ->whereIn('assignee_id', $technicalIds);
+
+        $stats = (clone $metricsTasks)
             ->selectRaw("
                 COUNT(*) as total_tasks,
                 SUM(CASE WHEN status != 'completed' THEN 1 ELSE 0 END) as open_tasks,
@@ -88,41 +95,48 @@ class ProjectKanbanController extends Controller
             ")
             ->first();
 
-        $avgDeliveryHours = Task::where('project_id', $project->id)
+        $avgDeliveryHours = (clone $metricsTasks)
             ->where('status', 'completed')
             ->whereNotNull('completed_at')
             ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, created_at, completed_at)) as avg_hours')
             ->value('avg_hours');
 
-        $hoursUsed = (float) DB::table('dailies')->where('project_id', $project->id)->sum('hours');
-        $allocatedHours = (float) $project->employees()->sum('project_employees.allocated_hours');
+        $hoursUsed = (float) DB::table('dailies')
+            ->where('project_id', $project->id)
+            ->whereIn('employee_id', $technicalIds)
+            ->sum('hours');
+        $allocatedHours = (float) $project->employees()
+            ->where('employees.sector', Employee::SECTOR_TECNICO)
+            ->sum('project_employees.allocated_hours');
 
-        $byCategory = Task::where('project_id', $project->id)
+        $byCategory = (clone $metricsTasks)
             ->select('category', DB::raw('COUNT(*) as total'))
             ->groupBy('category')
             ->pluck('total', 'category');
 
-        $byPriority = Task::where('project_id', $project->id)
+        $byPriority = (clone $metricsTasks)
             ->where('status', '!=', 'completed')
             ->select('priority', DB::raw('COUNT(*) as total'))
             ->groupBy('priority')
             ->pluck('total', 'priority');
 
-        $byStatus = Task::where('project_id', $project->id)
+        $byStatus = (clone $metricsTasks)
             ->where('status', '!=', 'completed')
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        $teamCount = $project->employees()->count();
+        $teamCount = $project->employees()
+            ->where('employees.sector', Employee::SECTOR_TECNICO)
+            ->count();
 
         $monthStart = now()->startOfMonth();
-        $burnDown = Task::where('project_id', $project->id)
+        $burnDown = (clone $metricsTasks)
             ->where('created_at', '>=', $monthStart)
             ->selectRaw('DATE(created_at) as day, COUNT(*) as opened')
             ->groupBy('day')->orderBy('day')->get();
 
-        $burnDownClosed = Task::where('project_id', $project->id)
+        $burnDownClosed = (clone $metricsTasks)
             ->where('status', 'completed')
             ->where('completed_at', '>=', $monthStart)
             ->selectRaw('DATE(completed_at) as day, COUNT(*) as closed')

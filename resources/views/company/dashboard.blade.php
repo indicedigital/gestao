@@ -91,8 +91,9 @@
         height: 300px;
     }
     
-    .table-overdue {
-        background-color: #fff5f5;
+    .table-overdue tbody tr td {
+        background-color: var(--table-danger-bg);
+        color: var(--table-danger-text);
     }
     
     .card-modern {

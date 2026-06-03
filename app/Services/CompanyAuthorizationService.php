@@ -143,6 +143,11 @@ class CompanyAuthorizationService
         return $this->canAccessModule('productivity');
     }
 
+    public function canViewTeamDailies(): bool
+    {
+        return $this->canAccessModule('dailies') && $this->hasFullDataScope('dailies');
+    }
+
     public function canViewProjectOverview(): bool
     {
         return $this->canAccessModule('project_overview');
@@ -262,12 +267,48 @@ class CompanyAuthorizationService
             return false;
         }
 
-        return in_array($this->role(), [...self::MANAGER_ROLES, 'user'], true);
+        if (in_array($this->role(), [...self::MANAGER_ROLES, 'user'], true)) {
+            return true;
+        }
+
+        if ($this->role() === 'freelancer') {
+            return $this->hasActiveProjectMembership();
+        }
+
+        return false;
+    }
+
+    public function canCreateTaskOnProject(Project $project): bool
+    {
+        if (! $this->canAccessModule('tasks') || ! $this->canViewProject($project)) {
+            return false;
+        }
+
+        if (in_array($this->role(), [...self::MANAGER_ROLES, 'user'], true)) {
+            return true;
+        }
+
+        if ($this->role() === 'freelancer') {
+            return $this->isOnProjectTeam($project->id);
+        }
+
+        return false;
     }
 
     public function canDeleteTask(Task $task): bool
     {
-        return $this->canManage() && $this->sameCompany($task->company_id);
+        if ($task->trashed()) {
+            return false;
+        }
+
+        return $this->canAccessModule('tasks')
+            && $this->sameCompany($task->company_id)
+            && $this->canViewTask($task);
+    }
+
+    public function canViewTrashedTasks(): bool
+    {
+        return in_array($this->role(), ['owner', 'admin'], true);
     }
 
     public function canViewTask(Task $task): bool
@@ -298,7 +339,20 @@ class CompanyAuthorizationService
             return false;
         }
 
-        return $this->canManage() || in_array($task->assignee_id, $this->employeeIds(), true);
+        if ($this->canManage()) {
+            return true;
+        }
+
+        if (in_array($task->assignee_id, $this->employeeIds(), true)) {
+            return true;
+        }
+
+        return $this->canFreelancerEditProjectTask($task);
+    }
+
+    public function canEditTaskPlanningFields(Task $task): bool
+    {
+        return $this->canManage() || $this->canFreelancerEditProjectTask($task);
     }
 
     public function canUpdateTaskField(Task $task, string $field): bool
@@ -308,6 +362,14 @@ class CompanyAuthorizationService
         }
 
         $assigneeFields = ['title', 'description', 'status', 'estimated_hours'];
+        $planningFields = [
+            ...$assigneeFields,
+            'category', 'priority', 'assignee_id', 'sla_deadline', 'requester_type', 'requester_name',
+        ];
+
+        if ($this->canFreelancerEditProjectTask($task)) {
+            return in_array($field, $planningFields, true);
+        }
 
         return in_array($task->assignee_id, $this->employeeIds(), true)
             && in_array($field, $assigneeFields, true);
@@ -323,8 +385,15 @@ class CompanyAuthorizationService
             return true;
         }
 
-        return in_array($this->role(), ['user', 'freelancer'], true)
-            && in_array($task->assignee_id, $this->employeeIds(), true);
+        if (! in_array($this->role(), ['user', 'freelancer'], true)) {
+            return false;
+        }
+
+        if (in_array($task->assignee_id, $this->employeeIds(), true)) {
+            return true;
+        }
+
+        return $this->canFreelancerEditProjectTask($task);
     }
 
     public function canManageSubtasks(Task $task): bool
@@ -387,9 +456,30 @@ class CompanyAuthorizationService
         }
 
         $employeeIds = $this->employeeIds();
+        if (empty($employeeIds)) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
         $query->where(function ($q) use ($employeeIds) {
             $q->whereHas('tasks', fn ($t) => $t->whereIn('assignee_id', $employeeIds))
                 ->orWhereHas('employees', fn ($e) => $e->whereIn('employees.id', $employeeIds));
+        });
+    }
+
+    public function applyFreelancerProjectScope($query): void
+    {
+        $employeeIds = $this->employeeIds();
+        if (empty($employeeIds)) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->whereHas('employees', function ($e) use ($employeeIds) {
+            $e->whereIn('employees.id', $employeeIds)
+                ->where('project_employees.is_active', true);
         });
     }
 
@@ -441,6 +531,27 @@ class CompanyAuthorizationService
         $this->profilePermissions = PermissionModules::collaboratorDefaults();
 
         return $this->profilePermissions;
+    }
+
+    protected function canFreelancerEditProjectTask(Task $task): bool
+    {
+        if ($this->role() !== 'freelancer' || ! $task->project_id) {
+            return false;
+        }
+
+        return $this->isOnProjectTeam((int) $task->project_id);
+    }
+
+    protected function hasActiveProjectMembership(): bool
+    {
+        if (empty($this->employeeIds())) {
+            return false;
+        }
+
+        return DB::table('project_employees')
+            ->whereIn('employee_id', $this->employeeIds())
+            ->where('is_active', true)
+            ->exists();
     }
 
     protected function isOnProjectTeam(int $projectId): bool

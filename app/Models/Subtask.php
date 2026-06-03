@@ -23,7 +23,7 @@ class Subtask extends Model
     ];
 
     protected $casts = [
-        'due_date' => 'date',
+        'due_date' => 'datetime',
         'hours_spent' => 'decimal:2',
     ];
 

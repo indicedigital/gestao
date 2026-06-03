@@ -1414,7 +1414,7 @@
                     </a>
                     @endif
                     @if($access && ($access['modules']['dailies'] ?? false))
-                    <a href="{{ route('company.dailies.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.dailies.index') ? 'active' : '' }}" data-title="Daily">
+                    <a href="{{ route('company.dailies.index') }}" class="sidebar-menu-item {{ request()->routeIs('company.dailies.index', 'company.dailies.collaborator') ? 'active' : '' }}" data-title="Daily">
                         <i class="fas fa-clipboard-list"></i>
                         <span>Daily</span>
                     </a>
@@ -1586,29 +1586,7 @@
         </div>
     </div>
     
-    <!-- Bottom Navigation Mobile -->
-    <nav class="bottom-nav-mobile">
-        <a href="{{ route('company.dashboard') }}?mobile=1" class="bottom-nav-mobile-item {{ request()->routeIs('company.dashboard') ? 'active' : '' }}">
-            <i class="fas fa-home"></i>
-            <span>Principal</span>
-        </a>
-        <a href="{{ route('company.clients.index') }}?mobile=1" class="bottom-nav-mobile-item {{ request()->routeIs('company.clients.*') ? 'active' : '' }}">
-            <i class="fas fa-users"></i>
-            <span>Clientes</span>
-        </a>
-        <a href="{{ route('company.contracts.index') }}?mobile=1" class="bottom-nav-mobile-item {{ request()->routeIs('company.contracts.*') ? 'active' : '' }}">
-            <i class="fas fa-file-contract"></i>
-            <span>Contratos</span>
-        </a>
-        <a href="{{ route('company.receivables.index') }}?mobile=1" class="bottom-nav-mobile-item {{ request()->routeIs('company.receivables.*') ? 'active' : '' }}">
-            <i class="fas fa-arrow-circle-down"></i>
-            <span>Receber</span>
-        </a>
-        <a href="{{ route('company.payables.index') }}?mobile=1" class="bottom-nav-mobile-item {{ request()->routeIs('company.payables.*') ? 'active' : '' }}">
-            <i class="fas fa-arrow-circle-up"></i>
-            <span>Pagar</span>
-        </a>
-    </nav>
+    @include('components.mobile-bottom-nav')
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1746,28 +1724,58 @@
 
         // Função global para confirmação de exclusão
         window.confirmDelete = function(event) {
-            event.preventDefault();
             const form = event.target.closest('form');
+            if (!form) return;
+
+            if (form.dataset.deleteConfirmed === '1') {
+                form.removeAttribute('data-delete-confirmed');
+                if (window.AppLoading) AppLoading.show('Excluindo...');
+                return;
+            }
+
+            event.preventDefault();
+            if (window.AppLoading) AppLoading.forceHide();
+
+            const message = form.dataset.message || 'Esta ação não pode ser desfeita no quadro.';
+
             Swal.fire({
                 title: 'Tem certeza?',
-                text: "Você não poderá reverter isso!",
+                text: message,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Sim, excluir!',
-                cancelButtonText: 'Cancelar'
+                confirmButtonText: 'Sim, excluir',
+                cancelButtonText: 'Cancelar',
+                focusCancel: true,
             }).then((result) => {
                 if (result.isConfirmed) {
-                    form.submit();
+                    form.dataset.deleteConfirmed = '1';
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                } else if (window.AppLoading) {
+                    AppLoading.forceHide();
                 }
             });
         };
 
         // Função global para confirmação de ação genérica
         window.confirmAction = function(event, title = 'Confirmar Ação?', text = 'Você tem certeza que deseja prosseguir?', confirmButtonText = 'Sim, prosseguir!') {
-            event.preventDefault();
             const form = event.target.closest('form');
+            if (!form) return;
+
+            if (form.dataset.actionConfirmed === '1') {
+                form.removeAttribute('data-action-confirmed');
+                if (window.AppLoading) AppLoading.show('Processando...');
+                return;
+            }
+
+            event.preventDefault();
+            if (window.AppLoading) AppLoading.forceHide();
+
             Swal.fire({
                 title: title,
                 text: text,
@@ -1776,10 +1784,18 @@
                 confirmButtonColor: '#5e72e4',
                 cancelButtonColor: '#6c757d',
                 confirmButtonText: confirmButtonText,
-                cancelButtonText: 'Cancelar'
+                cancelButtonText: 'Cancelar',
+                focusCancel: true,
             }).then((result) => {
                 if (result.isConfirmed) {
-                    form.submit();
+                    form.dataset.actionConfirmed = '1';
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                } else if (window.AppLoading) {
+                    AppLoading.forceHide();
                 }
             });
         };

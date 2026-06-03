@@ -637,7 +637,45 @@
 .dev-tag.status-homologation { background: rgba(255,214,0,0.15); color: #b8860b; }
 .dev-tag.project { background: var(--bg-surface-2); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
 .dev-tag.deadline { background: transparent; color: var(--text-muted); padding-left: 0; }
-.dev-tag.deadline.overdue { color: #f5365c; font-weight: 700; }
+.dev-tag.deadline.overdue { color: var(--color-danger); font-weight: 700; }
+.dev-tag.overdue-late {
+    background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+    color: var(--color-danger);
+    font-weight: 700;
+}
+[data-theme="dark"] .dev-task-row.overdue .dev-task-name,
+[data-theme="dark"] .dev-task-row.overdue .dev-tag.project {
+    color: var(--text-primary);
+}
+[data-theme="dark"] .dev-tag.deadline.overdue,
+[data-theme="dark"] .dev-tag.overdue-late {
+    color: #ff9eb3;
+}
+
+.dev-overdue-section .dev-section-head {
+    border-bottom-color: rgba(245, 54, 92, 0.2);
+}
+.dev-overdue-section.has-overdue .dev-section-body {
+    border-top: 2px solid rgba(245, 54, 92, 0.15);
+}
+
+.dev-task-rank-danger {
+    background: rgba(245, 54, 92, 0.15) !important;
+    color: #f5365c !important;
+    border-color: transparent !important;
+    font-size: 11px;
+}
+
+.dev-empty-inline {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 28px 22px;
+}
+.dev-empty-inline .dev-empty-icon.success-tone {
+    background: rgba(45, 206, 137, 0.12);
+    color: #2dce89;
+}
 
 .dev-task-side {
     display: flex;

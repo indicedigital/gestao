@@ -34,7 +34,19 @@
                         @enderror
                     </div>
 
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <label for="sector" class="form-label">Setor <span class="text-danger">*</span></label>
+                        <select class="form-select @error('sector') is-invalid @enderror" id="sector" name="sector" required>
+                            @foreach(\App\Models\Employee::sectorLabels() as $value => $label)
+                                <option value="{{ $value }}" @selected(old('sector', $employee->sector ?? 'tecnico') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('sector')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="col-md-3 mb-3">
                         <label for="name" class="form-label">Nome <span class="text-danger">*</span></label>
                         <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name', $employee->name) }}" required>
                         @error('name')

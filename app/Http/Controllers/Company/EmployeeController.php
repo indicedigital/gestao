@@ -69,6 +69,7 @@ class EmployeeController extends Controller
         
         $validated = $request->validate([
             'type' => 'required|in:clt,pj,freelancer',
+            'sector' => 'required|in:tecnico,comercial',
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
@@ -129,6 +130,7 @@ class EmployeeController extends Controller
         
         $validated = $request->validate([
             'type' => 'required|in:clt,pj,freelancer',
+            'sector' => 'required|in:tecnico,comercial',
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',

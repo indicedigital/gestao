@@ -60,10 +60,6 @@ class DeveloperDashboardController extends Controller
             ->where('completed_at', '>=', $monthStart)
             ->count();
 
-        $totalAssigned = $assignedTaskQuery()->count();
-        $completedTotal = $assignedTaskQuery()->where('status', 'completed')->count();
-        $completionRate = $totalAssigned > 0 ? round(($completedTotal / $totalAssigned) * 100) : 0;
-
         $activeProjects = Project::where('company_id', $company->id)
             ->where(function ($q) use ($employeeIds) {
                 $q->whereHas('tasks', fn ($t) => $t->whereIn('assignee_id', $employeeIds)->where('status', '!=', 'completed'))
@@ -206,7 +202,6 @@ class DeveloperDashboardController extends Controller
             'overdueCount',
             'completedWeek',
             'completedMonth',
-            'completionRate',
             'activeProjects',
             'todayDailies',
             'todayHours',
@@ -227,6 +222,8 @@ class DeveloperDashboardController extends Controller
             'estimatedOpenHours',
             'actualOpenHours',
             'slaRate',
+            'slaOnTime',
+            'slaClosed',
         ));
     }
 

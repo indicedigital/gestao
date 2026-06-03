@@ -61,7 +61,22 @@ body {
 .stat-label { color: var(--text-muted) !important; }
 .stat-value { color: var(--text-primary) !important; }
 
-.table-overdue { background-color: var(--table-danger-bg) !important; }
+.table-overdue tbody tr,
+.table-overdue tbody tr td {
+    background-color: var(--table-danger-bg) !important;
+    color: var(--table-danger-text) !important;
+    box-shadow: inset 0 0 0 9999px var(--table-danger-bg) !important;
+}
+.table-overdue tbody tr:hover td {
+    background-color: var(--table-danger-hover) !important;
+    box-shadow: inset 0 0 0 9999px var(--table-danger-hover) !important;
+}
+.table-overdue tbody tr .text-muted {
+    color: var(--table-danger-muted) !important;
+}
+.table-overdue tbody tr .text-danger {
+    color: var(--table-danger-accent) !important;
+}
 
 /* ===== Páginas financeiras / CRUD legado ===== */
 .filter-card,
@@ -107,6 +122,25 @@ body {
 .table tbody tr:hover td {
     background: var(--bg-hover) !important;
     color: var(--text-primary) !important;
+}
+.table tbody tr.table-danger > td,
+.table tbody tr.table-danger:hover > td {
+    color: var(--table-danger-text) !important;
+    background-color: var(--table-danger-bg) !important;
+    box-shadow: inset 0 0 0 9999px var(--table-danger-bg) !important;
+}
+.table tbody tr.table-danger:hover > td {
+    background-color: var(--table-danger-hover) !important;
+    box-shadow: inset 0 0 0 9999px var(--table-danger-hover) !important;
+}
+.table tbody tr.table-danger .text-muted {
+    color: var(--table-danger-muted) !important;
+}
+.table tbody tr.table-danger .text-danger {
+    color: var(--table-danger-accent) !important;
+}
+.table tbody tr.table-danger strong {
+    color: var(--table-danger-text) !important;
 }
 
 .empty-state {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -9,9 +10,23 @@ class Employee extends Model
 {
     use SoftDeletes;
 
+    public const SECTOR_TECNICO = 'tecnico';
+
+    public const SECTOR_COMERCIAL = 'comercial';
+
+    /** @return array<string, string> */
+    public static function sectorLabels(): array
+    {
+        return [
+            self::SECTOR_TECNICO => 'Técnico',
+            self::SECTOR_COMERCIAL => 'Comercial',
+        ];
+    }
+
     protected $fillable = [
         'company_id',
         'type',
+        'sector',
         'name',
         'email',
         'phone',
@@ -32,6 +47,16 @@ class Employee extends Model
         'dismissal_date' => 'date',
         'deleted_at' => 'datetime',
     ];
+
+    public function scopeForOperationalMetrics(Builder $query): Builder
+    {
+        return $query->where('sector', self::SECTOR_TECNICO);
+    }
+
+    public function isTecnico(): bool
+    {
+        return $this->sector === self::SECTOR_TECNICO;
+    }
 
     /**
      * Empresa

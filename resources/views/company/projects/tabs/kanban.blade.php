@@ -91,7 +91,7 @@
                     </div>
                 @endforeach
             </div>
-            @if(app(\App\Services\CompanyAuthorizationService::class)->canCreateTask())
+            @if(app(\App\Services\CompanyAuthorizationService::class)->canCreateTaskOnProject($project))
             <a href="{{ route('company.tasks.create', ['project_id' => $project->id, 'status' => $column['key'], 'redirect_to' => 'kanban']) }}" class="kanban-add-task">
                 <i class="fas fa-plus me-1"></i> Adicionar Tarefa
             </a>

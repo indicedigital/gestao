@@ -137,6 +137,7 @@ Route::middleware(['auth', 'verified', 'company.member', 'not.client', 'module.a
 
     // Tasks
     Route::get('tasks/export/excel', [TaskController::class, 'exportExcel'])->name('tasks.export.excel');
+    Route::get('tasks/trash', [TaskController::class, 'trashed'])->name('tasks.trash');
     Route::resource('tasks', TaskController::class);
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.update-status');
     Route::post('tasks/{task}/comments', [TaskController::class, 'storeComment'])->name('tasks.comments.store');
@@ -150,6 +151,7 @@ Route::middleware(['auth', 'verified', 'company.member', 'not.client', 'module.a
     Route::get('dailies/productivity', [ProductivityController::class, 'index'])->name('dailies.productivity');
     Route::get('dailies/productivity/tab', [ProductivityController::class, 'tab'])->name('dailies.productivity.tab');
     Route::get('dailies/export/excel', [DailyController::class, 'exportExcel'])->name('dailies.export.excel');
+    Route::get('dailies/colaborador/{employee}', [DailyController::class, 'showCollaborator'])->name('dailies.collaborator');
     Route::resource('dailies', DailyController::class)->only(['index', 'store', 'destroy']);
 
     // Leads

@@ -16,6 +16,11 @@
                 <i class="fas fa-plus me-2"></i>Nova Task
             </a>
             @endif
+            @if($authz->canViewTrashedTasks())
+            <a href="{{ route('company.tasks.trash') }}" class="btn btn-outline-secondary" title="Tasks excluídas">
+                <i class="fas fa-trash-alt"></i>
+            </a>
+            @endif
             @if($authz->canManage())
             <a href="{{ route('company.tasks.export.excel', request()->query()) }}" class="btn btn-outline-success">
                 <i class="fas fa-file-excel me-1"></i>Exportar

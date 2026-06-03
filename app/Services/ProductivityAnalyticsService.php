@@ -166,12 +166,13 @@ class ProductivityAnalyticsService
         $this->resolvePeriod();
 
         $this->employees = Employee::where('company_id', $companyId)
+            ->forOperationalMetrics()
             ->when($this->filters['employee_id'], fn ($q, $id) => $q->whereKey($id))
             ->when($this->filters['team'], fn ($q, $team) => $q->where('position', $team))
             ->when($this->filters['inactive'], fn ($q) => $q->where('status', '!=', 'active'))
             ->when(! $this->filters['inactive'], fn ($q) => $q->where('status', 'active'))
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'position', 'role', 'hire_date', 'status']);
+            ->get(['id', 'name', 'email', 'position', 'role', 'hire_date', 'status', 'sector']);
 
         $this->employeeMetrics = $this->buildEmployeeMetrics();
     }
@@ -865,8 +866,8 @@ class ProductivityAnalyticsService
     protected function buildFilterOptions(): array
     {
         return [
-            'employees' => Employee::where('company_id', $this->companyId)->where('status', 'active')->orderBy('name')->get(['id', 'name']),
-            'teams' => Employee::where('company_id', $this->companyId)->whereNotNull('position')->distinct()->orderBy('position')->pluck('position'),
+            'employees' => Employee::where('company_id', $this->companyId)->where('status', 'active')->forOperationalMetrics()->orderBy('name')->get(['id', 'name']),
+            'teams' => Employee::where('company_id', $this->companyId)->forOperationalMetrics()->whereNotNull('position')->distinct()->orderBy('position')->pluck('position'),
             'projects' => Project::where('company_id', $this->companyId)->orderBy('name')->get(['id', 'name', 'client_id']),
             'categories' => Task::CATEGORIES,
             'statuses' => Task::STATUSES,

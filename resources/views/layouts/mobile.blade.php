@@ -789,29 +789,10 @@
         @yield('content')
     </div>
     
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
-        <a href="{{ route('company.dashboard') }}?mobile=1" class="bottom-nav-item {{ request()->routeIs('company.dashboard') ? 'active' : '' }}">
-            <i class="fas fa-home"></i>
-            <span>Principal</span>
-        </a>
-        <a href="{{ route('company.clients.index') }}?mobile=1" class="bottom-nav-item {{ request()->routeIs('company.clients.*') ? 'active' : '' }}">
-            <i class="fas fa-users"></i>
-            <span>Clientes</span>
-        </a>
-        <a href="{{ route('company.contracts.index') }}?mobile=1" class="bottom-nav-item {{ request()->routeIs('company.contracts.*') ? 'active' : '' }}">
-            <i class="fas fa-file-contract"></i>
-            <span>Contratos</span>
-        </a>
-        <a href="{{ route('company.receivables.index') }}?mobile=1" class="bottom-nav-item {{ request()->routeIs('company.receivables.*') ? 'active' : '' }}">
-            <i class="fas fa-arrow-circle-down"></i>
-            <span>Receber</span>
-        </a>
-        <a href="{{ route('company.payables.index') }}?mobile=1" class="bottom-nav-item {{ request()->routeIs('company.payables.*') ? 'active' : '' }}">
-            <i class="fas fa-arrow-circle-up"></i>
-            <span>Pagar</span>
-        </a>
-    </nav>
+    @include('components.mobile-bottom-nav', [
+        'navClass' => 'bottom-nav',
+        'itemClass' => 'bottom-nav-item',
+    ])
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

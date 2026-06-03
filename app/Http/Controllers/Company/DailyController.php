@@ -9,6 +9,7 @@ use App\Models\Daily;
 use App\Models\Employee;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Models\User;
 use App\Rules\BelongsToCompany;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -25,6 +26,10 @@ class DailyController extends Controller
 
     public function index(Request $request)
     {
+        if ($this->authz()->canViewTeamDailies()) {
+            return $this->adminIndex($request);
+        }
+
         $company = $this->getCurrentCompany();
         $authz = $this->authz();
         $brNow = Carbon::now(self::TZ);
@@ -143,8 +148,183 @@ class DailyController extends Controller
         ));
     }
 
+    public function adminIndex(Request $request)
+    {
+        abort_unless($this->authz()->canViewTeamDailies(), 403);
+
+        $company = $this->getCurrentCompany();
+        $brNow = Carbon::now(self::TZ);
+
+        $date = $request->query('date', $brNow->toDateString());
+        $viewMode = in_array($request->query('view'), ['table', 'cards'], true)
+            ? $request->query('view')
+            : 'cards';
+        $search = trim((string) $request->query('q', ''));
+
+        $employees = Employee::where('company_id', $company->id)
+            ->where('status', 'active')
+            ->forOperationalMetrics()
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('position', 'like', '%'.$search.'%');
+            }))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'position', 'role']);
+
+        $dayStats = Daily::where('company_id', $company->id)
+            ->whereDate('work_date', $date)
+            ->selectRaw('employee_id, user_id, SUM(hours) as total_hours, COUNT(*) as entries')
+            ->groupBy('employee_id', 'user_id')
+            ->get();
+
+        $userIdsByEmail = User::whereIn('email', $employees->pluck('email')->filter()->unique())
+            ->pluck('id', 'email');
+
+        $collaborators = $employees->map(function (Employee $employee) use ($dayStats, $userIdsByEmail) {
+            $userId = $employee->email ? ($userIdsByEmail[$employee->email] ?? null) : null;
+
+            $rows = $dayStats->filter(function ($row) use ($employee, $userId) {
+                if ($row->employee_id && (int) $row->employee_id === (int) $employee->id) {
+                    return true;
+                }
+
+                return $userId && (int) $row->user_id === (int) $userId;
+            });
+
+            $totalHours = (float) $rows->sum('total_hours');
+            $entries = (int) $rows->sum('entries');
+            $progress = min(100, round(($totalHours / self::DAILY_TARGET) * 100));
+
+            return [
+                'employee' => $employee,
+                'total_hours' => $totalHours,
+                'entries' => $entries,
+                'progress' => $progress,
+                'has_entries' => $entries > 0,
+            ];
+        });
+
+        $teamDayTotal = (float) $collaborators->sum('total_hours');
+        $teamWithEntries = $collaborators->where('has_entries', true)->count();
+        $selectedDate = Carbon::parse($date, self::TZ);
+
+        return view('company.dailies.admin-index', compact(
+            'company',
+            'date',
+            'viewMode',
+            'search',
+            'collaborators',
+            'teamDayTotal',
+            'teamWithEntries',
+            'selectedDate',
+        ));
+    }
+
+    public function showCollaborator(Request $request, Employee $employee)
+    {
+        abort_unless($this->authz()->canViewTeamDailies(), 403);
+
+        $company = $this->getCurrentCompany();
+        if ($employee->company_id !== $company->id || ! $employee->isTecnico()) {
+            abort(404);
+        }
+
+        $brNow = Carbon::now(self::TZ);
+        $date = $request->query('date', $brNow->toDateString());
+        $monthParam = $request->query('month', Carbon::parse($date, self::TZ)->format('Y-m'));
+
+        $monthStart = Carbon::createFromFormat('Y-m', $monthParam, self::TZ)->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
+        $userId = $employee->email
+            ? User::where('email', $employee->email)->value('id')
+            : null;
+
+        $dailyScope = fn ($query) => $query->where('company_id', $company->id)
+            ->where(function ($q) use ($employee, $userId) {
+                $q->where('employee_id', $employee->id);
+                if ($userId) {
+                    $q->orWhere('user_id', $userId);
+                }
+            });
+
+        $dailies = Daily::query()
+            ->tap($dailyScope)
+            ->whereDate('work_date', $date)
+            ->with(['task:id,title', 'subtask:id,title', 'project:id,name'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $dayTotal = (float) $dailies->sum('hours');
+        $dayProgress = min(100, round(($dayTotal / self::DAILY_TARGET) * 100));
+
+        $historyDays = Daily::query()
+            ->tap($dailyScope)
+            ->where('work_date', '>=', $brNow->copy()->subDays(90)->toDateString())
+            ->selectRaw('DATE(work_date) as day, SUM(hours) as total, COUNT(*) as entries')
+            ->groupBy('day')
+            ->orderByDesc('day')
+            ->get();
+
+        $hoursByDay = Daily::query()
+            ->tap($dailyScope)
+            ->whereBetween('work_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+            ->selectRaw('DATE(work_date) as day, SUM(hours) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day');
+
+        $maxDayHours = max(1.0, (float) $hoursByDay->max());
+
+        $calendarDays = [];
+        $pad = $monthStart->dayOfWeek;
+        for ($i = 0; $i < $pad; $i++) {
+            $calendarDays[] = ['empty' => true];
+        }
+        $cursor = $monthStart->copy();
+        while ($cursor->lte($monthEnd)) {
+            $key = $cursor->toDateString();
+            $hours = (float) ($hoursByDay[$key] ?? 0);
+            $calendarDays[] = [
+                'empty' => false,
+                'date' => $key,
+                'day' => $cursor->day,
+                'hours' => $hours,
+                'intensity' => $hours > 0 ? max(20, round(($hours / $maxDayHours) * 100)) : 0,
+                'is_today' => $key === $brNow->toDateString(),
+                'is_selected' => $key === $date,
+            ];
+            $cursor->addDay();
+        }
+
+        $prevDate = Carbon::parse($date, self::TZ)->subDay()->toDateString();
+        $nextDate = Carbon::parse($date, self::TZ)->addDay()->toDateString();
+        $monthLabel = $this->monthLabelPt($monthStart);
+        $prevMonth = $monthStart->copy()->subMonth()->format('Y-m');
+        $nextMonth = $monthStart->copy()->addMonth()->format('Y-m');
+
+        return view('company.dailies.admin-show', compact(
+            'company',
+            'employee',
+            'dailies',
+            'date',
+            'dayTotal',
+            'dayProgress',
+            'historyDays',
+            'calendarDays',
+            'monthParam',
+            'monthLabel',
+            'prevDate',
+            'nextDate',
+            'prevMonth',
+            'nextMonth',
+        ));
+    }
+
     public function store(Request $request)
     {
+        abort_if($this->authz()->canViewTeamDailies(), 403, 'Administradores utilizam a visão de equipe para consultar dailies.');
+
         $company = $this->getCurrentCompany();
 
         $validated = $request->validate([
@@ -217,7 +397,12 @@ class DailyController extends Controller
 
         $company = $this->getCurrentCompany();
 
+        $technicalIds = Employee::where('company_id', $company->id)
+            ->forOperationalMetrics()
+            ->pluck('id');
+
         $dailies = Daily::where('company_id', $company->id)
+            ->whereIn('employee_id', $technicalIds)
             ->whereYear('work_date', now()->year)
             ->whereMonth('work_date', now()->month)
             ->with(['task', 'project', 'employee', 'user'])

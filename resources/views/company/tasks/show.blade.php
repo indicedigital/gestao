@@ -16,6 +16,16 @@
     <div class="task-detail-layout">
         {{-- Coluna principal --}}
         <div class="task-detail-main">
+            @if($task->trashed())
+            <div class="alert alert-warning mb-3">
+                <i class="fas fa-trash-alt me-2"></i>
+                Esta task foi <strong>excluída</strong> e não aparece no quadro Kanban.
+                @if(app(\App\Services\CompanyAuthorizationService::class)->canViewTrashedTasks())
+                    <a href="{{ route('company.tasks.trash') }}" class="alert-link">Ver todas as excluídas</a>
+                @endif
+            </div>
+            @endif
+
             <div class="task-type-badge">
                 <i class="fas fa-check-square"></i> Tarefa
             </div>
@@ -25,13 +35,14 @@
                 <a href="{{ route('company.projects.kanban', $task->project) }}" class="btn btn-sm btn-outline-secondary">
                     <i class="fas fa-columns me-1"></i>Quadro
                 </a>
-                @if($canEdit)
+                @if($canEdit && ! $task->trashed())
                 <a href="{{ route('company.tasks.edit', $task) }}" class="btn btn-sm btn-outline-secondary">
                     <i class="fas fa-edit me-1"></i>Editar
                 </a>
                 @endif
                 @if($canDelete)
-                <form action="{{ route('company.tasks.destroy', $task) }}" method="POST" class="d-inline delete-form" data-message="Remover esta task permanentemente?">
+                <form action="{{ route('company.tasks.destroy', $task) }}" method="POST" class="d-inline delete-form"
+                      data-message="Excluir esta task? Ela sairá do quadro, mas o histórico de exclusão será mantido.">
                     @csrf @method('DELETE')
                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Excluir</button>
                 </form>
@@ -71,10 +82,13 @@
                     <div class="work-prop-value">{{ $task->estimated_hours ?? '—' }}h / {{ number_format($task->actual_hours, 1, ',', '.') }}h</div>
                 </div>
                 <div>
-                    <div class="work-prop-label">SLA</div>
+                    <div class="work-prop-label">Prazo de entrega</div>
                     <div class="work-prop-value {{ $task->isOverdue() ? 'text-danger' : '' }}">
                         @if($task->sla_deadline)
-                            {{ $task->sla_hours }}h — {{ $task->sla_deadline->format('d/m/Y H:i') }}
+                            {{ $task->sla_deadline->format('d/m/Y H:i') }}
+                            @if($task->sla_hours)
+                                <span class="text-muted small">({{ $task->sla_hours }}h SLA)</span>
+                            @endif
                         @else
                             <span class="empty">Vazio</span>
                         @endif
@@ -100,7 +114,7 @@
                             {{ $subtask->assignee->name ?? 'Sem responsável' }}
                             · {{ \App\Models\Subtask::STATUSES[$subtask->status] ?? $subtask->status }}
                             · {{ number_format($subtask->hours_spent, 1, ',', '.') }}h
-                            @if($subtask->due_date) · {{ $subtask->due_date->format('d/m/Y') }}@endif
+                            @if($subtask->due_date) · Prazo: {{ $subtask->due_date->format('d/m/Y H:i') }}@endif
                         </div>
                     </div>
                     @if($canManageSubtasks)
@@ -118,7 +132,7 @@
                 <p class="text-muted small">Nenhuma subtask.</p>
             @endforelse
 
-            @if($canManageSubtasks)
+            @if($canManageSubtasks && ! $task->trashed())
             <form action="{{ route('company.tasks.subtasks.store', $task) }}" method="POST" class="row g-2 mt-2">
                 @csrf
                 <div class="col-md-4"><input type="text" name="title" class="form-control form-control-sm" placeholder="Nova subtask" required></div>
@@ -130,7 +144,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3"><input type="date" name="due_date" class="form-control form-control-sm"></div>
+                <div class="col-md-3"><input type="datetime-local" name="due_date" class="form-control form-control-sm" title="Prazo de entrega"></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-sm btn-primary w-100">Adicionar</button></div>
             </form>
             @endif
@@ -154,10 +168,10 @@
             </form>
         </div>
 
-        {{-- Sidebar: Activity --}}
+        {{-- Sidebar: Atividade --}}
         <div class="task-detail-sidebar">
             <div class="task-activity-header">
-                <span>Activity</span>
+                <span>Atividade</span>
                 <span class="text-muted small">{{ $task->comments->count() + $task->histories->count() }}</span>
             </div>
             <div class="task-activity-feed">
@@ -183,8 +197,13 @@
                         <div class="task-activity-time">{{ $history->created_at->format('d/m/Y H:i') }}</div>
                         <div class="task-activity-text">
                             {{ $historyLabels[$history->action] ?? $history->action }}
-                            @if($history->field && $history->old_value !== $history->new_value)
-                                <br><span class="text-muted">{{ $history->old_value ?: '—' }} → {{ $history->new_value ?: '—' }}</span>
+                            @if($history->action === 'deleted')
+                                <br><span class="text-muted">“{{ $history->old_value }}” — por {{ $history->new_value }}</span>
+                            @elseif($history->field && $history->old_value !== $history->new_value)
+                                <br><span class="text-muted">
+                                    {{ $historyFieldLabels[$history->field] ?? $history->field }}:
+                                    {{ $history->old_value ?: '—' }} → {{ $history->new_value ?: '—' }}
+                                </span>
                             @endif
                         </div>
                     </div>
@@ -194,6 +213,7 @@
                     <p class="text-muted small text-center py-4">Nenhuma atividade ainda.</p>
                 @endif
             </div>
+            @if(! $task->trashed())
             <div class="task-comment-box">
                 <form action="{{ route('company.tasks.comments.store', $task) }}" method="POST">
                     @csrf
@@ -205,6 +225,7 @@
                     <button type="submit" class="btn btn-primary btn-sm">Enviar</button>
                 </form>
             </div>
+            @endif
         </div>
     </div>
 </div>

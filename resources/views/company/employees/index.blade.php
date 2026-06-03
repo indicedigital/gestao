@@ -32,6 +32,7 @@
                             <th>#</th>
                             <th>Nome</th>
                             <th>Tipo</th>
+                            <th>Setor</th>
                             <th>Cargo</th>
                             <th>E-mail</th>
                             <th>Status</th>
@@ -54,6 +55,11 @@
                                 @endphp
                                 <span class="badge bg-{{ $employee->type === 'clt' ? 'primary' : ($employee->type === 'pj' ? 'info' : 'secondary') }}">
                                     {{ $typeLabel }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ ($employee->sector ?? 'tecnico') === 'tecnico' ? 'success' : 'warning' }}">
+                                    {{ \App\Models\Employee::sectorLabels()[$employee->sector ?? 'tecnico'] ?? ucfirst($employee->sector ?? 'tecnico') }}
                                 </span>
                             </td>
                             <td>{{ $employee->role ?? '-' }}</td>
@@ -93,7 +99,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4">
+                            <td colspan="8" class="text-center py-4">
                                 <i class="fas fa-user-tie fa-3x text-muted mb-3"></i>
                                 <p class="text-muted">Nenhum funcionário cadastrado</p>
                                 <a href="{{ route('company.employees.create') }}" class="btn btn-primary">Cadastrar Primeiro Funcionário</a>

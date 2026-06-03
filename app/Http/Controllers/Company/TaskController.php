@@ -14,6 +14,7 @@ use App\Services\MentionParserService;
 use App\Services\SlaService;
 use App\Services\TaskHistoryService;
 use App\Services\TaskWorkflowService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -79,10 +80,26 @@ class TaskController extends Controller
         $authz = $this->authz();
 
         $tasks = $this->filteredQuery($request, $company)->latest()->paginate(20)->withQueryString();
-        $projects = Project::where('company_id', $company->id)->orderBy('name')->get(['id', 'name']);
+        $projects = $this->scopedProjectsQuery($company)->get(['id', 'name']);
         $employees = Employee::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get(['id', 'name']);
 
         return view('company.tasks.index', compact('company', 'tasks', 'projects', 'employees', 'authz'));
+    }
+
+    public function trashed(Request $request)
+    {
+        abort_unless($this->authz()->canViewTrashedTasks(), 403);
+
+        $company = $this->getCurrentCompany();
+
+        $tasks = Task::onlyTrashed()
+            ->where('company_id', $company->id)
+            ->with(['project:id,name', 'assignee:id,name', 'histories' => fn ($q) => $q->where('action', 'deleted')->latest()->limit(1)->with('user:id,name')])
+            ->latest('deleted_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('company.tasks.trash', compact('company', 'tasks'));
     }
 
     public function exportExcel(Request $request)
@@ -97,29 +114,58 @@ class TaskController extends Controller
 
     public function create(Request $request)
     {
-        abort_unless($this->authz()->canCreateTask(), 403);
-
         $company = $this->getCurrentCompany();
-        $projects = Project::where('company_id', $company->id)->orderBy('name')->get(['id', 'name']);
-        $employees = Employee::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get(['id', 'name']);
+        $authz = $this->authz();
         $selectedProject = $request->query('project_id');
 
-        return view('company.tasks.create', compact('company', 'projects', 'employees', 'selectedProject'));
+        $contextProject = null;
+
+        if ($selectedProject) {
+            $contextProject = Project::where('company_id', $company->id)
+                ->with('client:id,name')
+                ->findOrFail($selectedProject);
+            abort_unless($authz->canCreateTaskOnProject($contextProject), 403);
+            $projects = collect([$contextProject]);
+        } else {
+            abort_unless($authz->canCreateTask(), 403);
+            $projects = $this->scopedProjectsQuery($company)->get(['id', 'name']);
+        }
+
+        $employees = Employee::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get(['id', 'name']);
+
+        return view('company.tasks.create', compact('company', 'projects', 'employees', 'selectedProject', 'contextProject'));
     }
 
     public function store(Request $request)
     {
-        abort_unless($this->authz()->canCreateTask(), 403);
-
         $company = $this->getCurrentCompany();
         $validated = $this->validateTask($request, $company);
+
+        $project = Project::where('company_id', $company->id)->findOrFail($validated['project_id']);
+        abort_unless($this->authz()->canCreateTaskOnProject($project), 403);
+
+        $request->validate([
+            'subtasks' => ['nullable', 'array'],
+            'subtasks.*.title' => ['nullable', 'string', 'max:255'],
+            'subtasks.*.assignee_id' => ['nullable', new BelongsToCompany('employees', $company->id)],
+            'subtasks.*.due_date' => ['nullable', 'date'],
+        ], [], [
+            'subtasks.*.due_date' => 'prazo da subtask',
+        ]);
 
         $validated['company_id'] = $company->id;
         $validated['created_by'] = Auth::id();
         $validated['creation_channel'] = 'system';
 
+        if (! empty($validated['sla_deadline'])) {
+            $validated['sla_deadline'] = Carbon::parse($validated['sla_deadline']);
+        } else {
+            unset($validated['sla_deadline']);
+        }
+
         $task = Task::create($validated);
         $this->slaService->applyToTask($task);
+        $this->createSubtasksFromRequest($task, $request);
         $this->historyService->log($task, 'created');
 
         $redirect = $request->input('redirect_to') === 'kanban'
@@ -144,7 +190,7 @@ class TaskController extends Controller
         ]);
 
         $employees = Employee::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get(['id', 'name']);
-        $canEdit = $this->authz()->canUpdateTask($task);
+        $canEdit = ! $task->trashed() && $this->authz()->canUpdateTask($task);
         $canDelete = $this->authz()->canDeleteTask($task);
         $canManageSubtasks = $this->authz()->canManageSubtasks($task);
 
@@ -156,11 +202,22 @@ class TaskController extends Controller
         abort_unless($this->authz()->canUpdateTask($task), 403);
 
         $company = $this->getCurrentCompany();
+        $task->load(['project', 'subtasks.assignee']);
         $projects = Project::where('company_id', $company->id)->orderBy('name')->get(['id', 'name']);
         $employees = Employee::where('company_id', $company->id)->where('status', 'active')->orderBy('name')->get(['id', 'name']);
         $isManager = $this->authz()->canManage();
+        $canEditPlanning = $this->authz()->canEditTaskPlanningFields($task);
+        $contextProject = $task->project;
 
-        return view('company.tasks.edit', compact('company', 'task', 'projects', 'employees', 'isManager'));
+        return view('company.tasks.edit', compact(
+            'company',
+            'task',
+            'projects',
+            'employees',
+            'isManager',
+            'canEditPlanning',
+            'contextProject',
+        ));
     }
 
     public function update(Request $request, Task $task)
@@ -170,12 +227,25 @@ class TaskController extends Controller
         $company = $this->getCurrentCompany();
         $original = $task->getOriginal();
         $validated = $this->validateTask($request, $company, $task);
-        $isManager = $this->authz()->canManage();
+        $canEditPlanning = $this->authz()->canEditTaskPlanningFields($task);
 
-        if (! $isManager) {
+        if (! $canEditPlanning) {
             $validated = array_intersect_key($validated, array_flip([
                 'title', 'description', 'status', 'estimated_hours',
             ]));
+        } elseif (! $this->authz()->canManage()) {
+            unset($validated['project_id']);
+        }
+
+        if ($canEditPlanning) {
+            $request->validate([
+                'subtasks' => ['nullable', 'array'],
+                'subtasks.*.title' => ['nullable', 'string', 'max:255'],
+                'subtasks.*.assignee_id' => ['nullable', new BelongsToCompany('employees', $company->id)],
+                'subtasks.*.due_date' => ['nullable', 'date'],
+            ], [], [
+                'subtasks.*.due_date' => 'prazo da subtask',
+            ]);
         }
 
         if (isset($validated['status']) && ! $this->authz()->canMoveTaskStatus($task)) {
@@ -191,14 +261,28 @@ class TaskController extends Controller
             }
         }
 
+        if (array_key_exists('sla_deadline', $validated)) {
+            $validated['sla_deadline'] = $validated['sla_deadline']
+                ? Carbon::parse($validated['sla_deadline'])
+                : null;
+        }
+
         if ($validated) {
             $priorityChanged = isset($validated['priority']) && $validated['priority'] !== $task->priority;
             $task->update($validated);
+            if (array_key_exists('sla_deadline', $validated) && $task->sla_deadline) {
+                $task->sla_hours = max(1, (int) ceil(now()->diffInMinutes($task->sla_deadline) / 60));
+                $task->save();
+            }
             $this->historyService->logChanges($task, $original, $validated);
 
             if ($priorityChanged) {
                 $this->slaService->applyToTask($task->fresh());
             }
+        }
+
+        if ($canEditPlanning) {
+            $this->createSubtasksFromRequest($task, $request);
         }
 
         return redirect()->route('company.tasks.show', $task)->with('success', 'Task atualizada com sucesso!');
@@ -209,15 +293,20 @@ class TaskController extends Controller
         abort_unless($this->authz()->canDeleteTask($task), 403);
 
         $projectId = $task->project_id;
+        $title = $task->title;
 
-        foreach ($task->attachments as $attachment) {
-            Storage::disk('local')->delete($attachment->path);
-        }
+        $this->historyService->log(
+            $task,
+            'deleted',
+            null,
+            $title,
+            Auth::user()->name ?? 'Usuário'
+        );
 
         $task->delete();
 
         return redirect()->route('company.projects.kanban', $projectId)
-            ->with('success', 'Task removida com sucesso!');
+            ->with('success', 'Task excluída. Ela não aparecerá mais no quadro, mas o histórico foi preservado.');
     }
 
     public function updateStatus(Request $request, Task $task)
@@ -312,6 +401,20 @@ class TaskController extends Controller
         return Storage::disk('local')->download($attachment->path, $attachment->filename);
     }
 
+    protected function scopedProjectsQuery($company)
+    {
+        $authz = $this->authz();
+        $query = Project::where('company_id', $company->id)->orderBy('name');
+
+        if ($authz->isFreelancer()) {
+            $authz->applyFreelancerProjectScope($query);
+        } elseif (! $authz->hasFullDataScope('projects')) {
+            $authz->applyProjectScope($query);
+        }
+
+        return $query;
+    }
+
     protected function validateTask(Request $request, $company, ?Task $task = null): array
     {
         $rules = [
@@ -325,10 +428,15 @@ class TaskController extends Controller
             'requester_type' => ['nullable', Rule::in(['internal', 'client'])],
             'requester_name' => ['nullable', 'string', 'max:255'],
             'estimated_hours' => ['nullable', 'numeric', 'min:0'],
+            'sla_deadline' => ['nullable', 'date'],
         ];
 
         if ($this->authz()->canManage()) {
             // managers can set all fields
+        } elseif ($task && $this->authz()->canEditTaskPlanningFields($task)) {
+            if (! $this->authz()->canManage()) {
+                unset($rules['project_id']);
+            }
         } elseif ($task) {
             $rules = array_intersect_key($rules, array_flip([
                 'title', 'description', 'status', 'estimated_hours',
@@ -338,6 +446,29 @@ class TaskController extends Controller
         return $request->validate($rules, [], [
             'project_id' => 'projeto',
             'assignee_id' => 'responsável',
+            'sla_deadline' => 'prazo de entrega',
         ]) + ['status' => $request->input('status', $task?->status ?? 'backlog')];
+    }
+
+    protected function createSubtasksFromRequest(Task $task, Request $request): void
+    {
+        $position = 0;
+        foreach ($request->input('subtasks', []) as $row) {
+            $title = trim((string) ($row['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            $dueDate = ! empty($row['due_date']) ? Carbon::parse($row['due_date']) : null;
+
+            $subtask = $task->subtasks()->create([
+                'title' => $title,
+                'assignee_id' => $row['assignee_id'] ?? null,
+                'due_date' => $dueDate,
+                'position' => $position++,
+            ]);
+
+            $this->historyService->log($task, 'subtask_created', 'subtask', null, $subtask->title);
+        }
     }
 }

@@ -93,6 +93,7 @@
         if (!(form instanceof HTMLFormElement)) return;
         if (form.dataset.noLoading !== undefined) return;
         if (form.dataset.ajax !== undefined) return;
+        if (form.classList.contains('delete-form') && form.dataset.deleteConfirmed !== '1') return;
         AppLoading.show('Processando...');
     }, true);
 

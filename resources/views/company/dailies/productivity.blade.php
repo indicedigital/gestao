@@ -37,7 +37,7 @@
             </div>
             <div class="prod-hero-actions">
                 <a href="{{ route('company.dailies.index') }}" class="prod-action-btn">
-                    <i class="fas fa-book"></i><span>Daily</span>
+                    <i class="fas fa-book"></i><span>{{ app(\App\Services\CompanyAuthorizationService::class)->canViewTeamDailies() ? 'Daily equipe' : 'Daily' }}</span>
                 </a>
                 <a href="{{ route('company.dailies.export.excel') }}" class="prod-action-btn success">
                     <i class="fas fa-file-excel"></i><span>Exportar</span>

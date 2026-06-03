@@ -15,7 +15,7 @@
     <a href="{{ route('company.projects.team', $project) }}" class="nav-link project-tab-link" data-tab="team" @class(['active' => ($currentTab ?? '') === 'team' || request()->routeIs('company.projects.team*')])>
         <i class="fas fa-users me-1"></i> Equipe
     </a>
-    @if(app(\App\Services\CompanyAuthorizationService::class)->canCreateTask())
+    @if(app(\App\Services\CompanyAuthorizationService::class)->canCreateTaskOnProject($project))
     <a href="{{ route('company.tasks.create', ['project_id' => $project->id, 'redirect_to' => 'kanban']) }}" class="nav-link nav-cta">
         <i class="fas fa-plus me-1"></i> Nova Tarefa
     </a>

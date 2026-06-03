@@ -23,7 +23,7 @@
                     <i class="fas fa-edit me-1"></i>Editar
                 </a>
                 @endif
-                @if(app(\App\Services\CompanyAuthorizationService::class)->canCreateTask())
+                @if(app(\App\Services\CompanyAuthorizationService::class)->canCreateTaskOnProject($project))
                 <a href="{{ route('company.tasks.create', ['project_id' => $project->id, 'redirect_to' => 'kanban']) }}" class="btn btn-sm btn-primary">
                     <i class="fas fa-plus me-1"></i>Tarefa
                 </a>

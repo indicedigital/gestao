@@ -110,17 +110,6 @@
             </aside>
     </header>
 
-    @if($overdueCount > 0)
-        <div class="dev-alert danger" role="alert">
-            <div class="dev-alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
-            <div class="dev-alert-body">
-                <p class="dev-alert-title">{{ $overdueCount }} {{ $overdueCount === 1 ? 'tarefa com SLA estourado' : 'tarefas com SLA estourado' }}</p>
-                <p class="dev-alert-text">Priorize as entregas atrasadas para recuperar o prazo.</p>
-            </div>
-            <a href="{{ route('company.tasks.index') }}" class="dev-section-action">Ver tasks</a>
-        </div>
-    @endif
-
     {{-- KPIs --}}
     <section class="dev-kpi-grid" aria-label="Indicadores principais">
         <article class="dev-kpi primary">
@@ -139,12 +128,12 @@
                 <div class="dev-kpi-hint">{{ $reviewCount }} aguardando revisão</div>
             </div>
         </article>
-        <article class="dev-kpi {{ $overdueCount > 0 ? 'danger' : 'success' }}">
+        <article class="dev-kpi {{ $slaRate >= 80 ? 'success' : ($slaRate >= 50 ? 'warning' : 'danger') }}">
             <div class="dev-kpi-icon"><i class="fas fa-shield-alt"></i></div>
             <div>
                 <div class="dev-kpi-value">{{ $slaRate }}%</div>
                 <div class="dev-kpi-label">SLA no prazo</div>
-                <div class="dev-kpi-hint">{{ $overdueCount }} {{ $overdueCount === 1 ? 'atrasada' : 'atrasadas' }}</div>
+                <div class="dev-kpi-hint">{{ $slaOnTime }} de {{ $slaClosed }} no prazo</div>
             </div>
         </article>
         <article class="dev-kpi success">
@@ -163,12 +152,18 @@
                 <div class="dev-kpi-hint">{{ number_format($monthHours, 1, ',', '.') }}h · {{ $monthWorkDays }} dias ativos</div>
             </div>
         </article>
-        <article class="dev-kpi purple">
-            <div class="dev-kpi-icon"><i class="fas fa-chart-line"></i></div>
+        <article class="dev-kpi danger">
+            <div class="dev-kpi-icon"><i class="fas fa-calendar-times"></i></div>
             <div>
-                <div class="dev-kpi-value">{{ $completionRate }}%</div>
-                <div class="dev-kpi-label">Taxa de conclusão</div>
-                <div class="dev-kpi-bar"><div class="dev-kpi-bar-fill" style="width:{{ $completionRate }}%"></div></div>
+                <div class="dev-kpi-value">{{ $overdueCount }}</div>
+                <div class="dev-kpi-label">Prazo vencido</div>
+                <div class="dev-kpi-hint">
+                    @if($overdueCount > 0)
+                        Tasks abertas com entrega atrasada
+                    @else
+                        Nenhuma task com prazo vencido
+                    @endif
+                </div>
             </div>
         </article>
     </section>

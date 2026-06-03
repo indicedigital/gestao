@@ -27,6 +27,15 @@ class SlaService
 
     public function applyToTask(Task $task): Task
     {
+        if ($task->sla_deadline) {
+            if (! $task->sla_hours) {
+                $task->sla_hours = max(1, (int) ceil(now()->diffInMinutes($task->sla_deadline) / 60));
+                $task->save();
+            }
+
+            return $task;
+        }
+
         $hours = $this->resolveHoursForTask($task);
         $deadline = Carbon::now()->addHours($hours);
 

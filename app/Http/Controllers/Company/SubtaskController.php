@@ -26,6 +26,8 @@ class SubtaskController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'assignee_id' => ['nullable', new BelongsToCompany('employees', $company->id)],
             'due_date' => ['nullable', 'date'],
+        ], [], [
+            'due_date' => 'prazo de entrega',
         ]);
 
         $position = (int) $task->subtasks()->max('position') + 1;
@@ -46,6 +48,8 @@ class SubtaskController extends Controller
             'assignee_id' => ['nullable', new BelongsToCompany('employees', $company->id)],
             'status' => ['sometimes', Rule::in(array_keys(Subtask::STATUSES))],
             'due_date' => ['nullable', 'date'],
+        ], [], [
+            'due_date' => 'prazo de entrega',
         ]);
 
         $subtask->update($validated);

@@ -80,12 +80,18 @@ class AppServiceProvider extends ServiceProvider
 
         Route::bind('task', function ($value) {
             $companyId = session('current_company_id');
-            $query = Task::query();
+            $query = Task::withTrashed();
             if ($companyId) {
                 $query->where('company_id', $companyId);
             }
 
-            return $query->whereKey($value)->firstOrFail();
+            $task = $query->whereKey($value)->firstOrFail();
+
+            if ($task->trashed() && ! app(CompanyAuthorizationService::class)->canViewTrashedTasks()) {
+                abort(404);
+            }
+
+            return $task;
         });
 
         Route::bind('daily', function ($value) {
