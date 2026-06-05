@@ -148,6 +148,15 @@ class CompanyAuthorizationService
         return $this->canAccessModule('dailies') && $this->hasFullDataScope('dailies');
     }
 
+    public function canRegisterOwnDailies(): bool
+    {
+        if ($this->isClient()) {
+            return false;
+        }
+
+        return in_array($this->role(), ['user', 'freelancer', 'manager'], true);
+    }
+
     public function canViewProjectOverview(): bool
     {
         return $this->canAccessModule('project_overview');
@@ -201,6 +210,10 @@ class CompanyAuthorizationService
 
         if ($module === 'permission_profiles') {
             return $this->canManageProfiles();
+        }
+
+        if ($module === 'dailies' && $this->canRegisterOwnDailies()) {
+            return true;
         }
 
         $permissions = $this->effectivePermissions();
@@ -415,7 +428,11 @@ class CompanyAuthorizationService
             return true;
         }
 
-        return in_array($task->assignee_id, $this->employeeIds(), true);
+        if (in_array($task->assignee_id, $this->employeeIds(), true)) {
+            return true;
+        }
+
+        return $task->project_id && $this->isOnProjectTeam((int) $task->project_id);
     }
 
     public function canViewProject(Project $project): bool

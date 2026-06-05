@@ -26,6 +26,12 @@ class DailyController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless(
+            $this->authz()->canRegisterOwnDailies() || $this->authz()->canViewTeamDailies(),
+            403,
+            'Sem permissão para acessar o Daily.'
+        );
+
         if ($this->authz()->canViewTeamDailies()) {
             return $this->adminIndex($request);
         }
@@ -323,6 +329,8 @@ class DailyController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($this->authz()->canRegisterOwnDailies(), 403, 'Sem permissão para registrar daily.');
+
         abort_if($this->authz()->canViewTeamDailies(), 403, 'Administradores utilizam a visão de equipe para consultar dailies.');
 
         $company = $this->getCurrentCompany();
