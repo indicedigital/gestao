@@ -529,3 +529,69 @@ a.daily-bar-link {
 .daily-admin-row-empty td {
     color: var(--text-muted);
 }
+
+/* Task select with search (Tom Select) */
+.daily-form .ts-wrapper.daily-task-select {
+    width: 100%;
+}
+
+.daily-form .ts-wrapper.daily-task-select .ts-control {
+    border-radius: 8px;
+    border-color: var(--border-color, #e2e8f0);
+    min-height: 42px;
+    padding: 8px 12px;
+    background: var(--bg-input, #fff);
+    color: var(--text-primary, #1a202c);
+}
+
+.daily-form .ts-wrapper.daily-task-select.focus .ts-control {
+    border-color: var(--primary-color, #5e72e4);
+    box-shadow: 0 0 0 3px rgba(94, 114, 228, 0.15);
+}
+
+.daily-form .ts-wrapper.daily-task-select .ts-dropdown {
+    border-radius: 10px;
+    border-color: var(--border-color, #e2e8f0);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.daily-form .ts-wrapper.daily-task-select .dropdown-input-wrap {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background: var(--bg-surface-2, #f8fafc);
+}
+
+.daily-form .ts-wrapper.daily-task-select .dropdown-input {
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    padding: 8px 12px;
+    font-size: 14px;
+    background: var(--bg-input, #fff);
+    color: var(--text-primary, #1a202c);
+}
+
+.daily-form .ts-wrapper.daily-task-select .dropdown-input:focus {
+    border-color: var(--primary-color, #5e72e4);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(94, 114, 228, 0.12);
+}
+
+.daily-form .ts-wrapper.daily-task-select .option {
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.daily-form .ts-wrapper.daily-task-select .option.active {
+    background: rgba(94, 114, 228, 0.1);
+    color: var(--text-primary, #1a202c);
+}
+
+.daily-form .ts-wrapper.daily-task-select .option:hover,
+.daily-form .ts-wrapper.daily-task-select .option.selected {
+    background: var(--primary-color, #5e72e4);
+    color: #fff;
+}
+
+.daily-form .ts-wrapper.daily-task-select .no-results {
+    font-size: 13px;
+}

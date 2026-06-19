@@ -32,7 +32,7 @@
                     <div class="daily-kpi-value">{{ number_format($dayTotal, 1, ',', '.') }}h</div>
                 </div>
                 <div class="daily-kpi success">
-                    <div class="daily-kpi-label">Meta diária</div>
+                    <div class="daily-kpi-label">Meta diária ({{ number_format($dailyTarget, 1, ',', '.') }}h)</div>
                     <div class="daily-kpi-value">{{ $dayProgress }}%</div>
                 </div>
                 <div class="daily-kpi info">
@@ -62,7 +62,7 @@
                         <div class="daily-entry">
                             <div class="daily-entry-top">
                                 <div class="daily-entry-title">{{ $daily->task->title ?? 'Task removida' }}</div>
-                                <span class="daily-entry-hours">{{ number_format($daily->hours, 2, ',', '.') }}h</span>
+                                <span class="daily-entry-hours">{{ $daily->formatted_duration }}</span>
                             </div>
                             <div class="daily-entry-meta">
                                 @if($daily->project)
@@ -117,7 +117,7 @@
                             @else
                             <div class="daily-bar-cell {{ $cell['hours'] > 0 ? 'has-hours' : '' }} {{ $cell['is_today'] ? 'is-today' : '' }} {{ $cell['is_selected'] ? 'is-selected' : '' }}"
                                  style="--intensity: {{ $cell['intensity'] }}"
-                                 title="Dia {{ $cell['day'] }} — {{ number_format($cell['hours'], 1, ',', '.') }}h">
+                                 title="Dia {{ $cell['day'] }} — {{ \App\Support\DurationFormatter::format($cell['hours']) }}">
                                 <a href="{{ route('company.dailies.collaborator', ['employee' => $employee, 'date' => $cell['date'], 'month' => $monthParam]) }}" class="daily-bar-link" aria-label="Ver dia {{ $cell['day'] }}"></a>
                             </div>
                             @endif
@@ -145,7 +145,7 @@
                                     {{ $row->entries }} {{ $row->entries == 1 ? 'registro' : 'registros' }}
                                 </div>
                             </div>
-                            <span class="daily-history-hours">{{ number_format($row->total, 1, ',', '.') }}h</span>
+                            <span class="daily-history-hours">{{ \App\Support\DurationFormatter::format((float) $row->total) }}</span>
                         </a>
                     @empty
                         <div class="daily-empty">

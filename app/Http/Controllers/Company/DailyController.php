@@ -11,9 +11,11 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
 use App\Rules\BelongsToCompany;
+use App\Support\DurationFormatter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DailyController extends Controller
@@ -21,8 +23,6 @@ class DailyController extends Controller
     use InteractsWithCompany;
 
     private const TZ = 'America/Sao_Paulo';
-
-    private const DAILY_TARGET = 8.0;
 
     public function index(Request $request)
     {
@@ -54,8 +54,16 @@ class DailyController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $employee = Employee::where('company_id', $company->id)
+            ->where('email', Auth::user()->email)
+            ->first(['id', 'daily_hours_goal', 'monthly_hours_goal']);
+
+        $dailyTarget = $employee?->resolveDailyHoursGoal() ?? Employee::DEFAULT_DAILY_HOURS_GOAL;
+
         $dayTotal = (float) $dailies->sum('hours');
-        $dayProgress = min(100, round(($dayTotal / self::DAILY_TARGET) * 100));
+        $dayProgress = $employee
+            ? $employee->dailyProgress($dayTotal)
+            : min(100, (int) round(($dayTotal / Employee::DEFAULT_DAILY_HOURS_GOAL) * 100));
 
         $tasksQuery = Task::where('company_id', $company->id)
             ->where('status', '!=', 'completed')
@@ -78,7 +86,9 @@ class DailyController extends Controller
         $monthEntries = (int) ($monthStats->entries_count ?? 0);
 
         $businessDays = $this->businessDaysInMonth($monthStart);
-        $monthTargetHours = $businessDays * self::DAILY_TARGET;
+        $monthTargetHours = $employee
+            ? $employee->resolveMonthlyHoursGoal($businessDays)
+            : $businessDays * Employee::DEFAULT_DAILY_HOURS_GOAL;
         $monthProgress = $monthTargetHours > 0
             ? min(100, round(($monthTotalHours / $monthTargetHours) * 100))
             : 0;
@@ -135,6 +145,7 @@ class DailyController extends Controller
             'date',
             'dayTotal',
             'dayProgress',
+            'dailyTarget',
             'tasks',
             'monthStats',
             'monthTotalHours',
@@ -176,7 +187,7 @@ class DailyController extends Controller
                     ->orWhere('position', 'like', '%'.$search.'%');
             }))
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'position', 'role']);
+            ->get(['id', 'name', 'email', 'position', 'role', 'daily_hours_goal', 'monthly_hours_goal']);
 
         $dayStats = Daily::where('company_id', $company->id)
             ->whereDate('work_date', $date)
@@ -200,12 +211,14 @@ class DailyController extends Controller
 
             $totalHours = (float) $rows->sum('total_hours');
             $entries = (int) $rows->sum('entries');
-            $progress = min(100, round(($totalHours / self::DAILY_TARGET) * 100));
+            $dailyTarget = $employee->resolveDailyHoursGoal();
+            $progress = $employee->dailyProgress($totalHours);
 
             return [
                 'employee' => $employee,
                 'total_hours' => $totalHours,
                 'entries' => $entries,
+                'daily_target' => $dailyTarget,
                 'progress' => $progress,
                 'has_entries' => $entries > 0,
             ];
@@ -263,7 +276,8 @@ class DailyController extends Controller
             ->get();
 
         $dayTotal = (float) $dailies->sum('hours');
-        $dayProgress = min(100, round(($dayTotal / self::DAILY_TARGET) * 100));
+        $dailyTarget = $employee->resolveDailyHoursGoal();
+        $dayProgress = $employee->dailyProgress($dayTotal);
 
         $historyDays = Daily::query()
             ->tap($dailyScope)
@@ -316,6 +330,7 @@ class DailyController extends Controller
             'date',
             'dayTotal',
             'dayProgress',
+            'dailyTarget',
             'historyDays',
             'calendarDays',
             'monthParam',
@@ -340,9 +355,22 @@ class DailyController extends Controller
             'subtask_id' => ['nullable', 'exists:subtasks,id'],
             'work_date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:5000'],
-            'hours' => ['required', 'numeric', 'min:0.25', 'max:24'],
+            'duration_value' => ['required', 'numeric'],
+            'duration_unit' => ['required', 'in:hours,minutes'],
             'blockers' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        $hours = DurationFormatter::toHours(
+            (float) $validated['duration_value'],
+            $validated['duration_unit']
+        );
+
+        $durationCheck = DurationFormatter::validateHours($hours, $validated['duration_unit']);
+        if (! $durationCheck['valid']) {
+            throw ValidationException::withMessages([
+                'duration_value' => $durationCheck['message'],
+            ]);
+        }
 
         $task = Task::where('company_id', $company->id)->findOrFail($validated['task_id']);
         abort_unless($this->authz()->canRegisterDaily($task), 403);
@@ -369,7 +397,7 @@ class DailyController extends Controller
             'subtask_id' => $validated['subtask_id'] ?? null,
             'work_date' => $validated['work_date'],
             'description' => $validated['description'],
-            'hours' => $validated['hours'],
+            'hours' => $hours,
             'blockers' => $validated['blockers'] ?? null,
         ]);
 

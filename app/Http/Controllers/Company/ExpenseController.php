@@ -352,6 +352,7 @@ class ExpenseController extends Controller
             'supplier_id' => ['nullable', new BelongsToCompany('suppliers', $company->id)],
             'due_date_day' => 'required_if:type,fixed|nullable|integer|min:1|max:31',
             'due_date' => 'required_if:type,variable|nullable|date',
+            'is_paid' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
 
@@ -363,17 +364,25 @@ class ExpenseController extends Controller
         // Se for despesa variável, cria uma conta a pagar
         if ($expense->type === 'variable') {
             $supplierName = $expense->supplier ? $expense->supplier->name : null;
-            Payable::create([
+            $isPaid = $request->boolean('is_paid');
+            $payableData = [
                 'company_id' => $company->id,
                 'type' => 'service',
                 'category' => 'other',
                 'description' => $expense->description,
                 'value' => $expense->value,
                 'due_date' => $expense->due_date,
-                'status' => 'pending',
+                'status' => $isPaid ? 'paid' : 'pending',
                 'supplier_name' => $supplierName,
                 'notes' => $expense->notes,
-            ]);
+            ];
+
+            if ($isPaid) {
+                $payableData['paid_date'] = $expense->due_date;
+                $payableData['payment_method'] = 'Pix';
+            }
+
+            Payable::create($payableData);
         } else {
             // Se for despesa fixa, gera as duplicatas
             $service = new FixedExpenseService();

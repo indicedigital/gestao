@@ -167,6 +167,7 @@ Route::middleware(['auth', 'verified', 'company.member', 'not.client', 'module.a
     // Contas a Pagar
     Route::resource('payables', PayableController::class);
     Route::post('payables/{payable}/mark-as-paid', [PayableController::class, 'markAsPaid'])->name('payables.mark-as-paid');
+    Route::post('payables/bulk-mark-as-paid', [PayableController::class, 'bulkMarkAsPaid'])->name('payables.bulk-mark-as-paid');
     
            // Funcionários
            Route::resource('employees', EmployeeController::class);

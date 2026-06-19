@@ -81,12 +81,16 @@ class EmployeeController extends Controller
             'status' => 'nullable|in:active,inactive,dismissed',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
+            'daily_hours_goal' => 'nullable|numeric|min:0|max:24',
+            'monthly_hours_goal' => 'nullable|numeric|min:0|max:1000',
         ]);
 
         $validated['company_id'] = $company->id;
         if (!isset($validated['status'])) {
             $validated['status'] = 'active';
         }
+
+        $validated = $this->normalizeHoursGoals($validated);
 
         $employee = Employee::create($validated);
 
@@ -142,11 +146,15 @@ class EmployeeController extends Controller
             'status' => 'nullable|in:active,inactive,dismissed',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
+            'daily_hours_goal' => 'nullable|numeric|min:0|max:24',
+            'monthly_hours_goal' => 'nullable|numeric|min:0|max:1000',
         ]);
 
         $oldSalary = $employee->salary;
         $oldType = $employee->type;
         $oldStatus = $employee->status;
+
+        $validated = $this->normalizeHoursGoals($validated);
 
         $employee->update($validated);
 
@@ -197,5 +205,18 @@ class EmployeeController extends Controller
         if ($employee->company_id !== $company->id) {
             abort(403, 'Acesso negado.');
         }
+    }
+
+    protected function normalizeHoursGoals(array $validated): array
+    {
+        if (array_key_exists('daily_hours_goal', $validated) && ($validated['daily_hours_goal'] === '' || $validated['daily_hours_goal'] === null)) {
+            $validated['daily_hours_goal'] = null;
+        }
+
+        if (array_key_exists('monthly_hours_goal', $validated) && ($validated['monthly_hours_goal'] === '' || $validated['monthly_hours_goal'] === null)) {
+            $validated['monthly_hours_goal'] = null;
+        }
+
+        return $validated;
     }
 }

@@ -246,6 +246,40 @@ class PayableController extends Controller
             ->with('success', 'Conta a pagar marcada como paga!');
     }
 
+    public function bulkMarkAsPaid(Request $request)
+    {
+        $this->authorizeManage();
+        $company = $this->getCurrentCompany();
+
+        $validated = $request->validate([
+            'payable_ids' => 'required|array|min:1',
+            'payable_ids.*' => 'integer',
+            'paid_date' => 'required|date',
+            'payment_method' => 'nullable|string|max:50',
+        ]);
+
+        $payables = Payable::where('company_id', $company->id)
+            ->whereIn('id', $validated['payable_ids'])
+            ->where('status', 'pending')
+            ->get();
+
+        if ($payables->isEmpty()) {
+            return redirect()->back()
+                ->with('error', 'Nenhuma conta pendente selecionada.');
+        }
+
+        $paymentMethod = $validated['payment_method'] ?? 'Pix';
+
+        foreach ($payables as $payable) {
+            $payable->markAsPaid($validated['paid_date'], $paymentMethod);
+        }
+
+        $count = $payables->count();
+
+        return redirect()->back()
+            ->with('success', "{$count} conta(s) marcada(s) como paga(s)!");
+    }
+
     protected function authorizeAccess(Payable $payable, Company $company): void
     {
         if ($payable->company_id !== $company->id) {

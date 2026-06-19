@@ -49,16 +49,40 @@
 
     <!-- Lista de Contas a Pagar -->
     <div class="mobile-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
             <h5 style="margin: 0; font-size: 16px; font-weight: 600;">Lista de Contas a Pagar</h5>
             <span class="badge bg-primary" style="padding: 6px 12px; border-radius: 12px; font-size: 12px;">{{ count($payables) }} registro(s)</span>
         </div>
 
+        <div id="bulkActionsBarMobile" class="d-none" style="margin-bottom: 16px; padding: 12px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+            <div style="font-size: 13px; color: #166534; margin-bottom: 8px;">
+                <strong id="selectedCountMobile">0</strong> conta(s) selecionada(s)
+            </div>
+            <button type="button" class="btn btn-success btn-sm w-100" data-bs-toggle="modal" data-bs-target="#bulkMarkPaidModalMobile">
+                <i class="fas fa-check-double me-1"></i>Marcar como pagas
+            </button>
+        </div>
+
+        @php $hasPendingPayables = $payables->contains(fn($p) => $p->status === 'pending'); @endphp
+        @if($hasPendingPayables)
+        <div style="margin-bottom: 12px;">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAllPayablesMobile">
+                <label class="form-check-label" for="selectAllPayablesMobile" style="font-size: 13px;">Selecionar todas pendentes</label>
+            </div>
+        </div>
+        @endif
+
         @forelse($payables as $payable)
         <div class="mobile-card-item" style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid #e2e8f0; width: 100%; box-sizing: border-box; overflow: hidden; {{ $payable->isOverdue() ? 'border-left: 3px solid #f5365c;' : '' }}">
             <div class="mobile-card-item-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; gap: 8px;">
-                <div class="mobile-card-item-title" style="font-weight: 600; font-size: 15px; color: #1a202c; flex: 1; min-width: 0; word-wrap: break-word; overflow-wrap: break-word;">
-                    #{{ $payable->id }} - {{ $payable->description }}
+                <div style="display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0;">
+                    @if($payable->status === 'pending')
+                    <input type="checkbox" class="form-check-input payable-checkbox-mobile mt-1" value="{{ $payable->id }}" data-value="{{ $payable->value }}" style="flex-shrink: 0;">
+                    @endif
+                    <div class="mobile-card-item-title" style="font-weight: 600; font-size: 15px; color: #1a202c; flex: 1; min-width: 0; word-wrap: break-word; overflow-wrap: break-word;">
+                        #{{ $payable->id }} - {{ $payable->description }}
+                    </div>
                 </div>
                 @php
                     $statusColors = [
@@ -197,4 +221,98 @@
     </div>
 </div>
 @endforeach
+
+<!-- Modal para marcar múltiplas como pagas (mobile) -->
+<div class="modal fade" id="bulkMarkPaidModalMobile" tabindex="-1" aria-labelledby="bulkMarkPaidModalMobileLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('company.payables.bulk-mark-as-paid') }}" method="POST" id="bulkMarkPaidFormMobile">
+                @csrf
+                <div id="bulkPayableIdsContainerMobile"></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkMarkPaidModalMobileLabel">Marcar como pagas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Contas selecionadas: <strong id="bulkSelectedCountMobile">0</strong></label>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bulk_paid_date_mobile" class="form-label">Data de Pagamento <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="bulk_paid_date_mobile" name="paid_date" value="{{ date('Y-m-d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bulk_payment_method_mobile" class="form-label">Forma de Pagamento</label>
+                        <input type="text" class="form-control" id="bulk_payment_method_mobile" name="payment_method" value="Pix">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateBulkActionsBarMobile() {
+        const checked = document.querySelectorAll('.payable-checkbox-mobile:checked');
+        const count = checked.length;
+        const countEl = document.getElementById('selectedCountMobile');
+        const bulkCountEl = document.getElementById('bulkSelectedCountMobile');
+        const bar = document.getElementById('bulkActionsBarMobile');
+        const selectAll = document.getElementById('selectAllPayablesMobile');
+
+        if (countEl) countEl.textContent = count;
+        if (bulkCountEl) bulkCountEl.textContent = count;
+
+        if (bar) {
+            if (count > 0) {
+                bar.classList.remove('d-none');
+            } else {
+                bar.classList.add('d-none');
+                if (selectAll) selectAll.checked = false;
+            }
+        }
+    }
+
+    const selectAll = document.getElementById('selectAllPayablesMobile');
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.payable-checkbox-mobile').forEach(function(cb) {
+                cb.checked = selectAll.checked;
+            });
+            updateBulkActionsBarMobile();
+        });
+    }
+
+    document.querySelectorAll('.payable-checkbox-mobile').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            const total = document.querySelectorAll('.payable-checkbox-mobile').length;
+            const checked = document.querySelectorAll('.payable-checkbox-mobile:checked').length;
+            if (selectAll) selectAll.checked = total > 0 && total === checked;
+            updateBulkActionsBarMobile();
+        });
+    });
+
+    const modal = document.getElementById('bulkMarkPaidModalMobile');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function() {
+            const container = document.getElementById('bulkPayableIdsContainerMobile');
+            container.innerHTML = '';
+            document.querySelectorAll('.payable-checkbox-mobile:checked').forEach(function(cb) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'payable_ids[]';
+                input.value = cb.value;
+                container.appendChild(input);
+            });
+        });
+    }
+});
+</script>
+@endpush
 @endsection

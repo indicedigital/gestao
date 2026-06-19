@@ -90,8 +90,8 @@
                         <label for="type" class="form-label">Tipo de Despesa <span class="text-danger">*</span></label>
                         <select class="form-select @error('type') is-invalid @enderror" id="type" name="type" required onchange="toggleExpenseFields()">
                             <option value="">Selecione o tipo</option>
-                            <option value="fixed" {{ old('type') === 'fixed' ? 'selected' : '' }}>Fixa (Recorrente mensal)</option>
-                            <option value="variable" {{ old('type') === 'variable' ? 'selected' : '' }}>Variável (Única)</option>
+                            <option value="fixed" {{ old('type', 'variable') === 'fixed' ? 'selected' : '' }}>Fixa (Recorrente mensal)</option>
+                            <option value="variable" {{ old('type', 'variable') === 'variable' ? 'selected' : '' }}>Variável (Única)</option>
                         </select>
                         <small class="text-muted">Despesas fixas geram duplicatas mensais automaticamente. Despesas variáveis geram uma única duplicata.</small>
                         @error('type')
@@ -152,7 +152,7 @@
                 </div>
 
                 <!-- Campos para Despesa Fixa -->
-                <div class="row" id="fixed-fields" style="display: {{ old('type') === 'fixed' ? 'flex' : 'none' }};">
+                <div class="row" id="fixed-fields" style="display: {{ old('type', 'variable') === 'fixed' ? 'flex' : 'none' }};">
                     <div class="col-md-6 mb-3">
                         <label for="due_date_day" class="form-label">Dia do Vencimento <span class="text-danger">*</span></label>
                         <select class="form-select @error('due_date_day') is-invalid @enderror" id="due_date_day" name="due_date_day">
@@ -169,13 +169,20 @@
                 </div>
 
                 <!-- Campos para Despesa Variável -->
-                <div class="row" id="variable-fields" style="display: {{ old('type') === 'variable' ? 'flex' : 'none' }};">
+                <div class="row" id="variable-fields" style="display: {{ old('type', 'variable') === 'variable' ? 'flex' : 'none' }};">
                     <div class="col-md-6 mb-3">
                         <label for="due_date" class="form-label">Data de Vencimento <span class="text-danger">*</span></label>
-                        <input type="date" class="form-control @error('due_date') is-invalid @enderror" id="due_date" name="due_date" value="{{ old('due_date') }}">
+                        <input type="date" class="form-control @error('due_date') is-invalid @enderror" id="due_date" name="due_date" value="{{ old('due_date', date('Y-m-d')) }}">
                         @error('due_date')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+                    </div>
+                    <div class="col-md-6 mb-3 d-flex align-items-end">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_paid" id="is_paid" value="1" @checked(old('is_paid', true))>
+                            <label class="form-check-label fw-semibold" for="is_paid">PAGA</label>
+                            <small class="text-muted d-block">Se marcada, a conta a pagar será criada já como paga via Pix na data informada.</small>
+                        </div>
                     </div>
                 </div>
 

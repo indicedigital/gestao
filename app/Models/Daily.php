@@ -24,6 +24,11 @@ class Daily extends Model
         'hours' => 'decimal:2',
     ];
 
+    public function getFormattedDurationAttribute(): string
+    {
+        return \App\Support\DurationFormatter::format((float) $this->hours);
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

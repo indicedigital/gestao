@@ -351,6 +351,12 @@ body {
     color: var(--primary-color) !important;
 }
 .btn-outline-primary:hover { background: var(--primary-color) !important; color: #fff !important; }
+.btn-check:checked + .btn-outline-primary,
+.btn-check:active + .btn-outline-primary {
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #fff !important;
+}
 
 .modal-content { background: var(--bg-surface) !important; border-color: var(--border-color) !important; color: var(--text-primary) !important; }
 .modal-header, .modal-footer { border-color: var(--border-color) !important; }

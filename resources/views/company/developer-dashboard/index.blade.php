@@ -277,7 +277,7 @@
                                     <div class="dev-timeline-desc">{{ Str::limit($daily->description, 70) }}</div>
                                 @endif
                             </div>
-                            <span class="dev-timeline-hours">{{ number_format($daily->hours, 2, ',', '.') }}h</span>
+                            <span class="dev-timeline-hours">{{ $daily->formatted_duration }}</span>
                         </div>
                     @empty
                         <div class="dev-empty" style="padding:32px 20px">

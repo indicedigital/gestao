@@ -41,7 +41,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
-    @if(request()->routeIs('company.projects.*', 'company.tasks.*', 'company.dailies.*', 'portal.kanban', 'portal.tasks.show'))
+    @if(request()->routeIs('company.projects.*', 'company.tasks.*', 'company.dailies.*', 'company.employees.*', 'company.clients.*', 'portal.kanban', 'portal.tasks.show'))
     <link rel="stylesheet" href="{{ asset('css/work-module.css') }}">
     @endif
     @if(request()->routeIs('portal.*'))

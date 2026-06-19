@@ -120,6 +120,32 @@
                     </div>
                 </div>
 
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="daily_hours_goal" class="form-label">Meta de horas / dia</label>
+                        <div class="input-group">
+                            <input type="number" step="0.25" min="0" max="24" class="form-control @error('daily_hours_goal') is-invalid @enderror" id="daily_hours_goal" name="daily_hours_goal" value="{{ old('daily_hours_goal', 8) }}">
+                            <span class="input-group-text">h</span>
+                        </div>
+                        <small class="text-muted">Usada no acompanhamento do Daily para calcular o progresso diário.</small>
+                        @error('daily_hours_goal')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="monthly_hours_goal" class="form-label">Meta de horas / mês</label>
+                        <div class="input-group">
+                            <input type="number" step="0.25" min="0" max="1000" class="form-control @error('monthly_hours_goal') is-invalid @enderror" id="monthly_hours_goal" name="monthly_hours_goal" value="{{ old('monthly_hours_goal') }}" placeholder="Automático">
+                            <span class="input-group-text">h</span>
+                        </div>
+                        <small class="text-muted">Deixe em branco para calcular automaticamente (dias úteis × meta diária).</small>
+                        @error('monthly_hours_goal')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
                 <div class="mb-3">
                     <label for="address" class="form-label">Endereço</label>
                     <textarea class="form-control @error('address') is-invalid @enderror" id="address" name="address" rows="2">{{ old('address') }}</textarea>
@@ -143,5 +169,12 @@
             </form>
         </div>
     </div>
+
+    @include('company.partials.member-access', [
+        'type' => 'employee',
+        'entity' => new \App\Models\Employee(),
+        'access' => null,
+        'preview' => true,
+    ])
 </div>
 @endsection

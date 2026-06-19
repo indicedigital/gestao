@@ -232,10 +232,19 @@
     <!-- Tabela -->
     <div class="card-modern" id="tableContainer">
         <div class="card-body">
+            <div class="d-none justify-content-between align-items-center mb-3 flex-wrap gap-2" id="bulkActionsBar">
+                <span class="text-muted"><strong id="selectedCount">0</strong> conta(s) selecionada(s)</span>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#bulkMarkPaidModal">
+                    <i class="fas fa-check-double me-1"></i>Marcar selecionadas como pagas
+                </button>
+            </div>
             <div class="table-responsive">
                 <table id="payablesTable" class="table table-hover w-100">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" class="form-check-input" id="selectAllPayables" title="Selecionar todas pendentes">
+                            </th>
                             <th>ID</th>
                             <th>Descrição</th>
                             <th>Tipo</th>
@@ -250,6 +259,11 @@
                     <tbody>
                         @foreach($payables as $payable)
                         <tr class="{{ $payable->isOverdue() ? 'table-danger' : '' }}">
+                            <td>
+                                @if($payable->status === 'pending')
+                                <input type="checkbox" class="form-check-input payable-checkbox" value="{{ $payable->id }}" data-value="{{ $payable->value }}">
+                                @endif
+                            </td>
                             <td>{{ $payable->id }}</td>
                             <td>
                                 <strong>{{ $payable->description }}</strong>
@@ -386,6 +400,40 @@
 @endif
 @endforeach
 
+<!-- Modal para marcar múltiplas como pagas -->
+<div class="modal fade" id="bulkMarkPaidModal" tabindex="-1" aria-labelledby="bulkMarkPaidModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('company.payables.bulk-mark-as-paid') }}" method="POST" id="bulkMarkPaidForm">
+                @csrf
+                <div id="bulkPayableIdsContainer"></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkMarkPaidModalLabel">Marcar contas selecionadas como pagas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Contas selecionadas: <strong id="bulkSelectedCount">0</strong></label>
+                        <div class="text-muted small">Valor total: <strong id="bulkSelectedTotal">R$ 0,00</strong></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bulk_paid_date" class="form-label">Data de Pagamento <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="bulk_paid_date" name="paid_date" value="{{ date('Y-m-d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bulk_payment_method" class="form-label">Forma de Pagamento</label>
+                        <input type="text" class="form-control" id="bulk_payment_method" name="payment_method" value="Pix" placeholder="Ex: PIX, Boleto, Transferência...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Pagamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modais para exclusão -->
 @foreach($payables as $payable)
 <div class="modal fade" id="deleteModal{{ $payable->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $payable->id }}" aria-hidden="true">
@@ -429,9 +477,9 @@ $(document).ready(function() {
             url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
         },
         pageLength: 25,
-        order: [[5, 'asc']], // Ordenar por vencimento
+        order: [[6, 'asc']], // Ordenar por vencimento
         columnDefs: [
-            { orderable: false, targets: [8] } // Desabilitar ordenação na coluna de ações
+            { orderable: false, targets: [0, 9] } // Checkbox e ações
         ],
         dom: 'lrtip', // Remove o campo de busca padrão do DataTables (sem 'f')
         searching: false // Desabilita a busca do DataTables
@@ -458,6 +506,49 @@ $(document).ready(function() {
             // Submete o formulário
             form.submit();
         }, 500);
+    });
+
+    function formatCurrency(value) {
+        return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function updateBulkActionsBar() {
+        const checked = $('.payable-checkbox:checked');
+        const count = checked.length;
+        const total = checked.toArray().reduce((sum, el) => sum + parseFloat(el.dataset.value || 0), 0);
+
+        $('#selectedCount').text(count);
+        $('#bulkSelectedCount').text(count);
+        $('#bulkSelectedTotal').text(formatCurrency(total));
+
+        if (count > 0) {
+            $('#bulkActionsBar').removeClass('d-none').addClass('d-flex');
+        } else {
+            $('#bulkActionsBar').removeClass('d-flex').addClass('d-none');
+            $('#selectAllPayables').prop('checked', false);
+        }
+    }
+
+    $('#selectAllPayables').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        $('.payable-checkbox').prop('checked', isChecked);
+        updateBulkActionsBar();
+    });
+
+    $(document).on('change', '.payable-checkbox', function() {
+        const total = $('.payable-checkbox').length;
+        const checked = $('.payable-checkbox:checked').length;
+        $('#selectAllPayables').prop('checked', total > 0 && total === checked);
+        updateBulkActionsBar();
+    });
+
+    $('#bulkMarkPaidModal').on('show.bs.modal', function() {
+        const checked = $('.payable-checkbox:checked');
+        const container = $('#bulkPayableIdsContainer');
+        container.empty();
+        checked.each(function() {
+            container.append('<input type="hidden" name="payable_ids[]" value="' + $(this).val() + '">');
+        });
     });
 });
 </script>

@@ -10,6 +10,8 @@ class Employee extends Model
 {
     use SoftDeletes;
 
+    public const DEFAULT_DAILY_HOURS_GOAL = 8.0;
+
     public const SECTOR_TECNICO = 'tecnico';
 
     public const SECTOR_COMERCIAL = 'comercial';
@@ -39,10 +41,14 @@ class Employee extends Model
         'status',
         'address',
         'notes',
+        'daily_hours_goal',
+        'monthly_hours_goal',
     ];
 
     protected $casts = [
         'salary' => 'decimal:2',
+        'daily_hours_goal' => 'decimal:2',
+        'monthly_hours_goal' => 'decimal:2',
         'hire_date' => 'date',
         'dismissal_date' => 'date',
         'deleted_at' => 'datetime',
@@ -56,6 +62,31 @@ class Employee extends Model
     public function isTecnico(): bool
     {
         return $this->sector === self::SECTOR_TECNICO;
+    }
+
+    public function resolveDailyHoursGoal(): float
+    {
+        return (float) ($this->daily_hours_goal ?? self::DEFAULT_DAILY_HOURS_GOAL);
+    }
+
+    public function resolveMonthlyHoursGoal(int $businessDaysInMonth): float
+    {
+        if ($this->monthly_hours_goal !== null) {
+            return (float) $this->monthly_hours_goal;
+        }
+
+        return $businessDaysInMonth * $this->resolveDailyHoursGoal();
+    }
+
+    public function dailyProgress(float $hours): int
+    {
+        $target = $this->resolveDailyHoursGoal();
+
+        if ($target <= 0) {
+            return 0;
+        }
+
+        return min(100, (int) round(($hours / $target) * 100));
     }
 
     /**

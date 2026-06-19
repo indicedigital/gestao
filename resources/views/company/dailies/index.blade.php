@@ -4,6 +4,7 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/dailies.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.bootstrap5.min.css">
 @endpush
 
 @section('content')
@@ -37,7 +38,7 @@
                     <div class="daily-kpi-value">{{ number_format($dayTotal, 1, ',', '.') }}h</div>
                 </div>
                 <div class="daily-kpi success">
-                    <div class="daily-kpi-label">Meta diária</div>
+                    <div class="daily-kpi-label">Meta diária ({{ number_format($dailyTarget ?? 8, 1, ',', '.') }}h)</div>
                     <div class="daily-kpi-value">{{ $dayProgress }}%</div>
                 </div>
                 <div class="daily-kpi info">
@@ -68,8 +69,8 @@
                                 <input type="date" name="work_date" class="form-control" value="{{ old('work_date', $date) }}" required>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Task</label>
-                                <select name="task_id" id="daily-task" class="form-select" required>
+                                <label class="form-label" for="daily-task">Task</label>
+                                <select name="task_id" id="daily-task" class="form-select daily-task-select" required placeholder="Buscar task...">
                                     <option value="">Selecione a task</option>
                                     @foreach($tasks as $t)
                                         <option value="{{ $t->id }}" data-subtasks='@json($t->subtasks)' @selected(old('task_id') == $t->id)>
@@ -88,10 +89,7 @@
                                 <label class="form-label">O que foi feito</label>
                                 <textarea name="description" class="form-control" rows="3" required placeholder="Descreva o que você realizou...">{{ old('description') }}</textarea>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Tempo gasto (horas)</label>
-                                <input type="number" step="0.25" min="0.25" max="24" name="hours" class="form-control" value="{{ old('hours') }}" placeholder="Ex: 2.5" required>
-                            </div>
+                            @include('company.dailies._duration-input')
                             <div class="mb-3">
                                 <label class="form-label">Impedimentos <span class="text-muted fw-normal">(opcional)</span></label>
                                 <textarea name="blockers" class="form-control" rows="2" placeholder="Bloqueios ou dependências...">{{ old('blockers') }}</textarea>
@@ -125,7 +123,7 @@
                             <div class="daily-entry">
                                 <div class="daily-entry-top">
                                     <div class="daily-entry-title">{{ $daily->task->title ?? 'Task removida' }}</div>
-                                    <span class="daily-entry-hours">{{ number_format($daily->hours, 2, ',', '.') }}h</span>
+                                    <span class="daily-entry-hours">{{ $daily->formatted_duration }}</span>
                                 </div>
                                 <div class="daily-entry-meta">
                                     @if($daily->project)
@@ -233,7 +231,7 @@
                             @else
                             <div class="daily-bar-cell {{ $cell['hours'] > 0 ? 'has-hours' : '' }} {{ $cell['is_today'] ? 'is-today' : '' }} {{ $cell['is_selected'] ? 'is-selected' : '' }}"
                                  style="--intensity: {{ $cell['intensity'] }}"
-                                 title="Dia {{ $cell['day'] }} — {{ number_format($cell['hours'], 1, ',', '.') }}h">
+                                 title="Dia {{ $cell['day'] }} — {{ \App\Support\DurationFormatter::format($cell['hours']) }}">
                                 <a href="{{ route('company.dailies.index', ['date' => $cell['date'], 'month' => $monthParam]) }}" class="daily-bar-link" aria-label="Ver dia {{ $cell['day'] }}"></a>
                             </div>
                             @endif
@@ -269,7 +267,7 @@
                                     · {{ $row->entries }} {{ $row->entries == 1 ? 'registro' : 'registros' }}
                                 </div>
                             </div>
-                            <span class="daily-history-hours">{{ number_format($row->total, 1, ',', '.') }}h</span>
+                            <span class="daily-history-hours">{{ \App\Support\DurationFormatter::format((float) $row->total) }}</span>
                         </a>
                     @empty
                         <div class="daily-empty">
@@ -284,21 +282,67 @@
 </div>
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"></script>
 <script>
-document.getElementById('daily-task')?.addEventListener('change', function () {
+(function () {
     const subtaskSelect = document.getElementById('daily-subtask');
-    subtaskSelect.innerHTML = '<option value="">Nenhuma</option>';
-    const opt = this.selectedOptions[0];
-    if (!opt?.dataset.subtasks) return;
-    try {
-        JSON.parse(opt.dataset.subtasks).forEach(st => {
+    const taskEl = document.getElementById('daily-task');
+
+    function fillSubtasks(subtasks) {
+        if (!subtaskSelect) return;
+        subtaskSelect.innerHTML = '<option value="">Nenhuma</option>';
+        (subtasks || []).forEach(function (st) {
             subtaskSelect.insertAdjacentHTML('beforeend', `<option value="${st.id}">${st.title}</option>`);
         });
-    } catch (e) {}
-});
-@if(old('task_id'))
-document.getElementById('daily-task')?.dispatchEvent(new Event('change'));
-@endif
+    }
+
+    function subtasksFromOption(optionEl) {
+        if (!optionEl?.dataset.subtasks) return [];
+        try {
+            return JSON.parse(optionEl.dataset.subtasks);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    if (taskEl && typeof TomSelect !== 'undefined') {
+        const taskTomSelect = new TomSelect(taskEl, {
+            create: false,
+            maxOptions: null,
+            allowEmptyOption: true,
+            placeholder: 'Buscar task por projeto ou título...',
+            sortField: { field: 'text', direction: 'asc' },
+            plugins: ['dropdown_input'],
+            render: {
+                no_results: function () {
+                    return '<div class="no-results px-3 py-2 text-muted">Nenhuma task encontrada</div>';
+                },
+            },
+            onChange: function (value) {
+                if (!value) {
+                    fillSubtasks([]);
+                    return;
+                }
+                const optionEl = taskEl.querySelector(`option[value="${CSS.escape(String(value))}"]`);
+                fillSubtasks(subtasksFromOption(optionEl));
+            },
+        });
+
+        @if(old('task_id'))
+        const oldTaskId = @json((string) old('task_id'));
+        taskTomSelect.setValue(oldTaskId, true);
+        const oldOption = taskEl.querySelector('option[value="' + oldTaskId.replace(/"/g, '\\"') + '"]');
+        fillSubtasks(subtasksFromOption(oldOption));
+        @endif
+    } else if (taskEl) {
+        taskEl.addEventListener('change', function () {
+            fillSubtasks(subtasksFromOption(this.selectedOptions[0]));
+        });
+        @if(old('task_id'))
+        taskEl.dispatchEvent(new Event('change'));
+        @endif
+    }
+})();
 </script>
 @endpush
 @endsection

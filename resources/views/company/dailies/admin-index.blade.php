@@ -85,7 +85,7 @@
                                 <th>Cargo</th>
                                 <th>Registros</th>
                                 <th>Horas</th>
-                                <th>Meta (8h)</th>
+                                <th>Meta diária</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -105,7 +105,7 @@
                                     <div class="daily-admin-progress">
                                         <div class="daily-admin-progress-bar" style="width: {{ $row['progress'] }}%"></div>
                                     </div>
-                                    <span class="small text-muted">{{ $row['progress'] }}%</span>
+                                    <span class="small text-muted">{{ $row['progress'] }}% · {{ number_format($row['daily_target'], 1, ',', '.') }}h</span>
                                 </td>
                                 <td class="text-end">
                                     <a href="{{ route('company.dailies.collaborator', ['employee' => $row['employee'], 'date' => $date]) }}" class="btn btn-sm btn-outline-primary">
@@ -139,7 +139,7 @@
                 </div>
                 <div class="daily-admin-card-meta">
                     {{ $row['entries'] }} {{ $row['entries'] == 1 ? 'registro' : 'registros' }}
-                    · Meta {{ $row['progress'] }}%
+                    · Meta {{ $row['progress'] }}% ({{ number_format($row['daily_target'], 1, ',', '.') }}h)
                 </div>
                 <div class="daily-admin-progress mt-2">
                     <div class="daily-admin-progress-bar" style="width: {{ $row['progress'] }}%"></div>
