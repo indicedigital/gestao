@@ -9,21 +9,25 @@
     $permissionProfiles = $company
         ? \App\Models\CompanyPermissionProfile::where('company_id', $company->id)->orderBy('name')->get()
         : collect();
-    $storeRoute = $type === 'client'
-        ? route('company.clients.access.store', $entity)
-        : route('company.employees.access.store', $entity);
-    $updateRoute = $type === 'client'
-        ? route('company.clients.access.update', $entity)
-        : route('company.employees.access.update', $entity);
-    $destroyRoute = $type === 'client'
-        ? route('company.clients.access.destroy', $entity)
-        : route('company.employees.access.destroy', $entity);
+    $isPreview = ($preview ?? false) || ! ($entity->exists ?? true);
+    $entityLabel = $type === 'client' ? 'cliente' : 'colaborador';
     $defaultEmail = $entity->email ?? '';
     $defaultName = $entity->name ?? '';
     $suggestedRole = $type === 'employee' ? ($entity->type === 'freelancer' ? 'freelancer' : 'user') : 'client';
-    $isPreview = ($preview ?? false) || ! ($entity->exists ?? true);
-    $entityLabel = $type === 'client' ? 'cliente' : 'colaborador';
     $userInitial = $access ? mb_strtoupper(mb_substr($access['user']->name, 0, 1)) : mb_strtoupper(mb_substr($defaultName ?: '?', 0, 1));
+
+    $storeRoute = $updateRoute = $destroyRoute = null;
+    if (! $isPreview) {
+        $storeRoute = $type === 'client'
+            ? route('company.clients.access.store', $entity)
+            : route('company.employees.access.store', $entity);
+        $updateRoute = $type === 'client'
+            ? route('company.clients.access.update', $entity)
+            : route('company.employees.access.update', $entity);
+        $destroyRoute = $type === 'client'
+            ? route('company.clients.access.destroy', $entity)
+            : route('company.employees.access.destroy', $entity);
+    }
 @endphp
 
 <div class="member-access-card" id="member-access-panel">
